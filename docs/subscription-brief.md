@@ -19,7 +19,7 @@ Android tidak punya ID hardware permanen yang legal dipakai. Rekomendasi: **`Set
 - Reset hanya saat factory reset (abuse minor, ditoleransi).
 - Berlaku sama untuk Android TV.
 
-> Catatan abuse: factory reset = trial baru. Untuk MVP diterima; mitigasi lanjutan di Β§11.
+> Catatan abuse: factory reset = trial baru. Untuk MVP diterima; mitigasi lanjutan di §11.
 
 ## 3. Model entitlement
 | Status | Arti | Akses |
@@ -49,21 +49,23 @@ Entitlement dihitung **di server** tiap request: `premium jika (subscription_exp
 
 ## 5. Data model (tabel inti)
 - **devices**: `id`, `device_id` (ANDROID_ID, unik), `created_at`, `trial_expires_at`, `subscription_expires_at` (nullable), `status` (free/premium/banned), `last_seen`, `note_admin`.
-- **channels**: `id`, `name`, `logo_url`, `group/kategori`, `stream_url` (**URL asli/upstream — rahasia, hanya di server**), `stream_type`, `is_free` (bool), `is_enabled`, `sort_index`, `drm…`, `headers`.
+- **channels**: `id`, `name`, `logo_url`, `group/kategori`, `stream_url` (**URL asli/upstream — rahasia, hanya di server**), `stream_type`, `is_free` (bool), `is_enabled`, `sort_index`, `headers`, **DRM:** `drm_scheme` (widevine/playready/clearkey), `drm_license_url`, `drm_clearkey` (kid:key statik), `drm_license_headers`.
 - **admins**: `id`, `email`, `password_hash`, `role`.
 - **activation_logs**: `device_id`, `admin_id`, `action`, `old/new_expiry`, `at` (audit).
 
 ## 6. API backend
 | Endpoint | Fungsi |
 |----------|--------|
-| `POST /v1/sync` (body: deviceId, token?) | Daftar device kalau baru (mulai trial), balikan **entitlement + daftar channel terfilter** + `expires_at` (untuk countdown) + config (URL web, no WA, promo video) |
-| `GET /v1/config` | URL website, video promo, dll (remote, bisa ubah tanpa update app) |
+| `POST /v1/sync` (body: deviceId, token?) | Daftar device kalau baru (mulai trial), balikan **entitlement + daftar channel terfilter** + `expires_at` (untuk countdown) + config (URL web, video promo) |
+| `GET /v1/config` | URL website, video promo, **min versi app (force-update)**, dll (remote, bisa ubah tanpa update app) |
 | `GET /s/{channelId}?token=…` | **Proxy stream**: validasi token → **HTTP 302** redirect ke URL asli (lihat §7.1) |
 | **Admin (auth):** `…/devices` (list/edit/extend/ban), `…/channels` (CRUD), `…/login` | Dashboard |
 
+> **Versioning katalog:** `/v1/sync` menyertakan `catalog_version` (atau ETag); app mengirim versi yang dimilikinya → server balas daftar channel **hanya bila berubah**. Penting karena katalog bisa ribuan channel (hemat payload tiap sync).
+
 ## 7. Aturan akses channel + enforcement (anti-bajak)
-- **Premium/trial:** dapat semua channel **lengkap dengan stream_url**.
-- **Free:** channel free dapat stream_url; channel paid **dikirim TANPA stream_url** (hanya `name`, `logo`, `locked=true`).
+- **Premium/trial:** dapat semua channel **lengkap dengan URL proxy ber-token** (§7.1).
+- **Free:** channel free dapat **URL proxy ber-token**; channel paid **dikirim TANPA URL** (hanya `name`, `logo`, `locked=true`).
 - Jadi user gratis **secara fisik tidak punya URL** channel paid → tidak bisa dibajak walau utak-atik app. Penguncian di server, bukan cuma UI.
 - Klik channel terkunci → app putar **video promo berlangganan** + overlay tombol "Berlangganan".
 
@@ -72,12 +74,12 @@ Semua URL stream (`.m3u8` / `.mpd`) **tidak pernah dikirim apa adanya** ke app. 
 
 ```
 DB (asli, rahasia):  https://stream.nasatv.com.mk/hls/nasatv_live.m3u8
-Dikirim ke app:      https://websaya.com/s/nasatv?token=<token>
+Dikirim ke app:      https://api.rembuktv.my.id/s/nasatv?token=<token>
 ```
 
 **Mekanisme — 302 redirect (rekomendasi, murah):**
 1. `/v1/sync` mengembalikan URL proxy ber-token untuk tiap channel yang berhak.
-2. Player membuka `https://websaya.com/s/{channel}?token=…`.
+2. Player membuka `https://api.rembuktv.my.id/s/{channel}?token=…`.
 3. Endpoint **validasi token** (tanda tangan + kedaluwarsa + device tidak banned + berhak atas channel) → balas **HTTP 302** ke URL asli.
 4. Player lanjut ke URL asli; segmen HLS/DASH mengalir **langsung dari origin** → hemat bandwidth server.
 
@@ -109,8 +111,12 @@ Premium = hijau, Trial = kuning + hitung mundur, Gratis = abu.
 
 **d. WebView:** tombol berlangganan → buka **WebView** in-app memuat URL website (URL dari `/v1/config`, bisa diganti tanpa update app).
 
+**e. Sumber channel & hapus playlist user:** katalog channel kini dari **`/v1/sync`** (bukan lagi iptv-org / M3U lokal). Fitur **"tambah/kelola playlist" milik user dihapus** (konsekuensi §15 #2).
+
+**f. Caching & offline:** hasil `/v1/sync` (entitlement + channel) **di-cache ke Room** agar app buka cepat & tetap jalan saat backend sesaat mati (pakai status terakhir + grace, lalu turun ke Gratis). **First launch wajib online**; jika offline total → tampilkan layar "Butuh koneksi internet".
+
 ## 9. Website langganan (dibuka di WebView)
-Halaman sederhana: **paket & harga**, **cara berlangganan**, tombol **"Chat Admin (WhatsApp)"** untuk bayar (mis. QRIS statis / transfer) → admin aktivasi manual. Tampilkan **Device ID** user (via parameter URL) supaya admin gampang aktivasi.
+Halaman sederhana: **paket & harga**, **cara berlangganan**, dan tombol **"Chat Admin (WhatsApp)"**. Pembayaran lewat chat admin (metode mis. QRIS statis / transfer, ditentukan admin) → admin aktivasi manual. Tampilkan **Device ID** user (via parameter URL) supaya admin gampang aktivasi.
 
 ## 10. Dashboard Admin (web)
 - **Login admin**.
@@ -124,7 +130,7 @@ Admin **hanya menempel URL asli** + atur metadata; URL server & token dikerjakan
 - **Otomatis backend:** simpan URL asli sebagai rahasia (`stream_url`); saat `/v1/sync`, buat **URL proxy + token** per-device (§7.1); tipe stream dideteksi dari URL.
 - **Tidak diatur per channel:** token (dinamis per-device/waktu) & domain proxy (config global).
 
-Contoh: admin ketik `https://stream.nasatv.com.mk/hls/nasatv_live.m3u8` → app menerima `https://websaya.com/s/nasatv?token=<unik per device>`.
+Contoh: admin ketik `https://stream.nasatv.com.mk/hls/nasatv_live.m3u8` → app menerima `https://api.rembuktv.my.id/s/nasatv?token=<unik per device>`.
 
 ## 11. Keamanan & anti-abuse
 1. **Semua URL stream di-proxy ber-token (§7.1)** — URL asli tak pernah dikirim ke app; channel paid untuk device free bahkan tanpa token sama sekali. Paling krusial.
@@ -132,13 +138,16 @@ Contoh: admin ketik `https://stream.nasatv.com.mk/hls/nasatv_live.m3u8` → app 
 3. **Cache entitlement + grace** kalau backend mati (pakai status terakhir s/d X jam, lalu turun ke free).
 4. Token stream **bertanda tangan & cepat kedaluwarsa** agar link tak bisa dibagikan (§7.1); (lanjutan) deteksi pemakaian bersamaan.
 5. **Reminder legalitas konten**: jual akses konten harus berlisensi.
+6. **Rate limiting** di `/v1/sync` & `/s` (anti scraping token & abuse).
+7. **Keamanan admin:** password di-hash (bcrypt), sesi/JWT, wajib HTTPS, rate-limit login.
+8. **Secret di env:** HMAC key & kredensial DB di environment server, **bukan** di repo.
 
 ## 12. Tambahan yang disarankan
 - **Notifikasi "trial hampir habis"** (mis. sisa 10 menit) → pendorong konversi.
-- **Remote config** (URL web, nomor WA, video promo, durasi trial) — ubah tanpa update app.
+- **Remote config** (URL web, video promo, durasi trial) — ubah tanpa update app.
 - **Analitik** sederhana: channel populer, konversi trial→bayar.
 - **Tampilkan Device ID** di app (Settings) supaya user bisa kirim ke admin saat aktivasi.
-- **Pembayaran manual = MVP yang tepat** (chat admin + QRIS statis). Integrasi PSP/QRIS otomatis menyusul.
+- **Pembayaran manual = MVP yang tepat**: lewat Chat Admin WA di website (metode mis. QRIS statis/transfer). Integrasi PSP/QRIS otomatis menyusul.
 
 ## 13. Tech stack (backend: **shared hosting**)
 Dipilih: **shared web hosting** — termurah & cukup untuk semua kebutuhan brief ini (model proxy 302).
@@ -154,15 +163,18 @@ Dipilih: **shared web hosting** — termurah & cukup untuk semua kebutuhan brief
 
 ## 14. Fase pengerjaan
 1. **Fase 1 — Backend + entitlement:** DB, `/v1/sync`, registrasi device + trial 1 jam, katalog channel free/paid, **endpoint proxy `/s` + token bertanda tangan (§7.1)**, enforcement URL.
-2. **Fase 2 — Integrasi app:** chip status, tombol berlangganan, channel terkunci + promo video, WebView, Device ID di Settings.
+2. **Fase 2 — Integrasi app:** repoint sumber channel ke `/v1/sync` (+ cache ke Room, hapus UI tambah playlist), chip status, tombol berlangganan, channel terkunci + promo video, WebView, Device ID di Settings.
 3. **Fase 3 — Dashboard admin:** kelola user/channel + aktivasi manual + import M3U.
 4. **Fase 4 — Website + hardening:** halaman langganan + WA, token device, cache/grace, notifikasi, analitik.
 
-## 15. Keputusan yang perlu dikonfirmasi
-1. **Unit langganan: per-Device ID** (1 bayar = 1 device)? (multi-device butuh sistem akun).
-2. **Katalog channel sepenuhnya dari backend** — masih izinkan user tambah playlist sendiri, atau hapus untuk produk berbayar?
-3. ~~Tech stack backend~~ → **DIPUTUSKAN: shared hosting (PHP/Laravel + MySQL)** (lihat §13).
-4. **Video promo:** satu video umum, atau beda per channel?
-5. **Konten paid sudah berlisensi?** (prasyarat jualan).
-6. URL website + nomor WhatsApp admin (untuk di-config).
-7. **Mode proxy stream (§7.1):** 302 redirect (murah, rekomendasi) atau reverse proxy penuh (sembunyikan total, mahal bandwidth)? + domain proxy yang dipakai (mis. `websaya.com`).
+## 15. Keputusan (final)
+1. **Unit langganan:** per-Device ID — 1 bayar = 1 perangkat, tanpa sistem akun.
+2. **Katalog:** sepenuhnya dari backend; fitur user menambah playlist sendiri **dihapus**.
+3. **Tech stack backend:** shared hosting — PHP/Laravel + MySQL (§13).
+4. **Video promo:** satu video umum untuk semua channel paid (URL via config).
+5. **Legalitas konten:** legal — tidak mengambil dari IPTV berbayar mana pun.
+6. **Config:**
+   - Website langganan: `https://rembuktv.my.id` (halaman langganan).
+   - Nomor WhatsApp: **tidak** disimpan di app — tombol Chat Admin ada di dalam website (WebView).
+   - URL video promo: menyusul.
+7. **Proxy stream:** 302 redirect; domain proxy `https://api.rembuktv.my.id`.
