@@ -12,6 +12,11 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
+import androidx.media3.exoplayer.drm.DefaultDrmSessionManagerProvider
+import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
+import androidx.media3.exoplayer.drm.FrameworkMediaDrm
+import androidx.media3.exoplayer.drm.LocalMediaDrmCallback
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.session.MediaSession
@@ -71,7 +76,11 @@ class PlaybackService : MediaSessionService() {
         player = ExoPlayer.Builder(this)
             .setTrackSelector(trackSelector)
             .setLoadControl(loadControl)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(dataSourceFactory))
+            .setMediaSourceFactory(
+                DefaultMediaSourceFactory(this)
+                    .setDataSourceFactory(dataSourceFactory)
+                    .setDrmSessionManagerProvider(clearKeyDrmProvider()),
+            )
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
@@ -104,6 +113,26 @@ class PlaybackService : MediaSessionService() {
 
         // Use DefaultDataSource as base to support all protocols (file, asset, http, etc.)
         return DefaultDataSource.Factory(this, customHttpFactory)
+    }
+
+    /**
+     * DRM provider: channels with static ClearKey (kid:key) build a local-key session from
+     * [ClearKeyRegistry]; everything else falls back to the default provider (handles
+     * license-URL DRM from the MediaItem, and clear content).
+     */
+    private fun clearKeyDrmProvider(): DrmSessionManagerProvider {
+        val default = DefaultDrmSessionManagerProvider()
+        return DrmSessionManagerProvider { mediaItem ->
+            val json = ClearKeyRegistry.licenseJson(mediaItem.mediaId)
+            if (json != null) {
+                DefaultDrmSessionManager.Builder()
+                    .setUuidAndExoMediaDrmProvider(C.CLEARKEY_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
+                    .setMultiSession(true)
+                    .build(LocalMediaDrmCallback(json))
+            } else {
+                default.get(mediaItem)
+            }
+        }
     }
 
     /**
@@ -152,6 +181,7 @@ class PlaybackService : MediaSessionService() {
         }
         mediaSession = null
         PlaybackHeaders.clear()
+        ClearKeyRegistry.clear()
         super.onDestroy()
     }
 

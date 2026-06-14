@@ -16,7 +16,9 @@ fun ChannelEntity.toDomain(): Channel = Channel(
     group = group,
     streamUrl = streamUrl,
     streamType = runCatching { StreamType.valueOf(streamType) }.getOrDefault(StreamType.OTHER),
-    drm = drmScheme?.let { DrmInfo(scheme = it, licenseUrl = drmLicenseUrl) },
+    drm = drmScheme?.let {
+        DrmInfo(scheme = it, licenseUrl = drmLicenseUrl, clearKeys = decodeClearKeys(drmClearKeys))
+    },
     tvgId = tvgId,
     headers = decodeHeaders(headers),
 )
@@ -31,6 +33,7 @@ fun Channel.toEntity(sortIndex: Int): ChannelEntity = ChannelEntity(
     streamType = streamType.name,
     drmScheme = drm?.scheme,
     drmLicenseUrl = drm?.licenseUrl,
+    drmClearKeys = drm?.clearKeys?.takeIf { it.isNotEmpty() }?.let { encodeClearKeys(it) },
     tvgId = tvgId,
     sortIndex = sortIndex,
     headers = encodeHeaders(headers),
@@ -56,5 +59,16 @@ private fun decodeHeaders(encoded: String?): Map<String, String> {
     return encoded.split("|").mapNotNull {
         val parts = it.split("==", limit = 2)
         if (parts.size == 2) parts[0] to parts[1] else null
+    }.toMap()
+}
+
+private fun encodeClearKeys(keys: Map<String, String>): String =
+    keys.entries.joinToString(",") { "${it.key}:${it.value}" }
+
+private fun decodeClearKeys(encoded: String?): Map<String, String> {
+    if (encoded.isNullOrBlank()) return emptyMap()
+    return encoded.split(",").mapNotNull {
+        val parts = it.split(":", limit = 2)
+        if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotBlank()) parts[0] to parts[1] else null
     }.toMap()
 }

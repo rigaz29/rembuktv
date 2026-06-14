@@ -78,6 +78,7 @@ class M3uPlaylistParser @Inject constructor() {
     ) {
         private var drmScheme: String? = null
         private var drmLicenseUrl: String? = null
+        private val clearKeys = LinkedHashMap<String, String>()
         private val headers = HashMap(initialHeaders)
 
         fun applyProp(line: String) {
@@ -87,7 +88,12 @@ class M3uPlaylistParser @Inject constructor() {
             when {
                 key.endsWith("license_type") -> drmScheme = normalizeScheme(value)
                 key.endsWith("license_key") || key.endsWith("license_url") ->
-                    if (value.startsWith("http", ignoreCase = true)) drmLicenseUrl = value
+                    if (value.startsWith("http", ignoreCase = true)) {
+                        drmLicenseUrl = value
+                    } else {
+                        // Static ClearKey pairs, e.g. "kid:key" or "kid1:key1,kid2:key2".
+                        clearKeys.putAll(parseClearKeyPairs(value))
+                    }
                 key == "http-referrer" || key == "http-referer" -> headers["Referer"] = value
                 key == "http-user-agent" -> headers["User-Agent"] = value
             }
@@ -96,7 +102,12 @@ class M3uPlaylistParser @Inject constructor() {
         fun toChannel(playlistId: Long, url: String): Channel {
             val streamUrl = url.trim()
             val displayName = name.ifEmpty { streamUrl }
-            val drm = drmScheme?.let { DrmInfo(scheme = it, licenseUrl = drmLicenseUrl) }
+            val drm = when {
+                clearKeys.isNotEmpty() ->
+                    DrmInfo(drmScheme ?: "clearkey", drmLicenseUrl, clearKeys.toMap())
+                drmScheme != null -> DrmInfo(drmScheme!!, drmLicenseUrl)
+                else -> null
+            }
             return Channel(
                 id = stableChannelId(playlistId, tvgId ?: streamUrl, streamUrl),
                 playlistId = playlistId,
@@ -123,6 +134,13 @@ class M3uPlaylistParser @Inject constructor() {
         }
         return -1
     }
+
+    /** Parses ClearKey "kid:key" pairs (comma-separated) from a non-URL license_key value. */
+    private fun parseClearKeyPairs(value: String): Map<String, String> =
+        value.split(',').mapNotNull { pair ->
+            val p = pair.split(':')
+            if (p.size == 2 && p[0].isNotBlank() && p[1].isNotBlank()) p[0].trim() to p[1].trim() else null
+        }.toMap()
 
     private fun normalizeScheme(raw: String): String = when {
         raw.contains("widevine", ignoreCase = true) -> "widevine"

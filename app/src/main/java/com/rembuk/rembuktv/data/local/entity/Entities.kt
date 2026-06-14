@@ -38,6 +38,8 @@ data class ChannelEntity(
     val streamType: String,
     val drmScheme: String?,
     val drmLicenseUrl: String?,
+    /** Static ClearKey pairs serialized as "kid:key,kid:key" (no license server). */
+    val drmClearKeys: String? = null,
     val tvgId: String?,
     /** Preserves the original playlist ordering. */
     val sortIndex: Int,

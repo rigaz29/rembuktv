@@ -39,20 +39,27 @@ object MediaItemFactory {
             MediaItem.LiveConfiguration.Builder().setMaxPlaybackSpeed(1.04f).build(),
         )
 
+        // Register/clear static ClearKey (kid:key) for this media id; the player's
+        // DrmSessionManagerProvider picks it up. Keyed by media id like PlaybackHeaders.
+        ClearKeyRegistry.set(channel.id, channel.drm?.clearKeys ?: emptyMap())
+
         channel.drm?.let { drm ->
-            val uuid = when (drm.scheme.lowercase()) {
-                "widevine" -> C.WIDEVINE_UUID
-                "playready" -> C.PLAYREADY_UUID
-                "clearkey" -> C.CLEARKEY_UUID
-                else -> null
-            }
-            if (uuid != null && !drm.licenseUrl.isNullOrBlank()) {
-                builder.setDrmConfiguration(
-                    MediaItem.DrmConfiguration.Builder(uuid)
-                        .setLicenseUri(drm.licenseUrl)
-                        .setMultiSession(true)
-                        .build(),
-                )
+            // Static ClearKey is handled via the registry above (no license server).
+            if (drm.clearKeys.isEmpty()) {
+                val uuid = when (drm.scheme.lowercase()) {
+                    "widevine" -> C.WIDEVINE_UUID
+                    "playready" -> C.PLAYREADY_UUID
+                    "clearkey" -> C.CLEARKEY_UUID
+                    else -> null
+                }
+                if (uuid != null && !drm.licenseUrl.isNullOrBlank()) {
+                    builder.setDrmConfiguration(
+                        MediaItem.DrmConfiguration.Builder(uuid)
+                            .setLicenseUri(drm.licenseUrl)
+                            .setMultiSession(true)
+                            .build(),
+                    )
+                }
             }
         }
 

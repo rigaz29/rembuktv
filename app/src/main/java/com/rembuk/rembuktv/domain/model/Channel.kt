@@ -24,4 +24,6 @@ enum class StreamType { DASH, HLS, OTHER }
 data class DrmInfo(
     val scheme: String,
     val licenseUrl: String? = null,
+    /** Static ClearKey pairs (KID -> KEY, hex or base64url), used when there is no license server. */
+    val clearKeys: Map<String, String> = emptyMap(),
 )

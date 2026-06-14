@@ -34,6 +34,55 @@ class M3uPlaylistParserTest {
     }
 
     @Test
+    fun `parses static clearkey kid key pair from kodiprop`() {
+        val m3u = """
+            #EXTM3U
+            #EXTINF:-1,Protected ClearKey
+            #KODIPROP:inputstream.adaptive.license_type=clearkey
+            #KODIPROP:inputstream.adaptive.license_key=abc123:def456
+            http://s/ck.mpd
+        """.trimIndent()
+
+        val channels = parser.parse(m3u, playlistId = 1)
+
+        assertEquals(1, channels.size)
+        assertEquals("clearkey", channels[0].drm?.scheme)
+        assertEquals(mapOf("abc123" to "def456"), channels[0].drm?.clearKeys)
+        assertNull(channels[0].drm?.licenseUrl)
+    }
+
+    @Test
+    fun `parses multiple clearkey pairs and defaults scheme without license_type`() {
+        val m3u = """
+            #EXTM3U
+            #EXTINF:-1,Keys Only
+            #KODIPROP:inputstream.adaptive.license_key=k1:v1,k2:v2
+            http://s/x.mpd
+        """.trimIndent()
+
+        val channels = parser.parse(m3u, playlistId = 1)
+
+        assertEquals(mapOf("k1" to "v1", "k2" to "v2"), channels[0].drm?.clearKeys)
+        assertEquals("clearkey", channels[0].drm?.scheme)
+    }
+
+    @Test
+    fun `license url maps to licenseUrl not clearkeys`() {
+        val m3u = """
+            #EXTM3U
+            #EXTINF:-1,Server DRM
+            #KODIPROP:inputstream.adaptive.license_type=clearkey
+            #KODIPROP:inputstream.adaptive.license_key=https://license.example/ck
+            http://s/y.mpd
+        """.trimIndent()
+
+        val channels = parser.parse(m3u, playlistId = 1)
+
+        assertEquals("https://license.example/ck", channels[0].drm?.licenseUrl)
+        assertTrue(channels[0].drm?.clearKeys?.isEmpty() == true)
+    }
+
+    @Test
     fun `drops extinf without a following url`() {
         val m3u = """
             #EXTM3U
