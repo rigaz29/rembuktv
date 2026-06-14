@@ -49,7 +49,7 @@ Entitlement dihitung **di server** tiap request: `premium jika (subscription_exp
 
 ## 5. Data model (tabel inti)
 - **devices**: `id`, `device_id` (ANDROID_ID, unik), `created_at`, `trial_expires_at`, `subscription_expires_at` (nullable), `status` (free/premium/banned), `last_seen`, `note_admin`.
-- **channels**: `id`, `name`, `logo_url`, `group/kategori`, `stream_url`, `stream_type`, `is_free` (bool), `is_enabled`, `sort_index`, `drm…`, `headers`.
+- **channels**: `id`, `name`, `logo_url`, `group/kategori`, `stream_url` (**URL asli/upstream — rahasia, hanya di server**), `stream_type`, `is_free` (bool), `is_enabled`, `sort_index`, `drm…`, `headers`.
 - **admins**: `id`, `email`, `password_hash`, `role`.
 - **activation_logs**: `device_id`, `admin_id`, `action`, `old/new_expiry`, `at` (audit).
 
@@ -58,6 +58,7 @@ Entitlement dihitung **di server** tiap request: `premium jika (subscription_exp
 |----------|--------|
 | `POST /v1/sync` (body: deviceId, token?) | Daftar device kalau baru (mulai trial), balikan **entitlement + daftar channel terfilter** + `expires_at` (untuk countdown) + config (URL web, no WA, promo video) |
 | `GET /v1/config` | URL website, video promo, dll (remote, bisa ubah tanpa update app) |
+| `GET /s/{channelId}?token=…` | **Proxy stream**: validasi token → **HTTP 302** redirect ke URL asli (lihat §7.1) |
 | **Admin (auth):** `…/devices` (list/edit/extend/ban), `…/channels` (CRUD), `…/login` | Dashboard |
 
 ## 7. Aturan akses channel + enforcement (anti-bajak)
@@ -65,6 +66,30 @@ Entitlement dihitung **di server** tiap request: `premium jika (subscription_exp
 - **Free:** channel free dapat stream_url; channel paid **dikirim TANPA stream_url** (hanya `name`, `logo`, `locked=true`).
 - Jadi user gratis **secara fisik tidak punya URL** channel paid → tidak bisa dibajak walau utak-atik app. Penguncian di server, bukan cuma UI.
 - Klik channel terkunci → app putar **video promo berlangganan** + overlay tombol "Berlangganan".
+
+### 7.1 Proxy URL stream (sembunyikan URL asli + token)
+Semua URL stream (`.m3u8` / `.mpd`) **tidak pernah dikirim apa adanya** ke app. Backend membungkusnya jadi URL domain sendiri ber-token:
+
+```
+DB (asli, rahasia):  https://stream.nasatv.com.mk/hls/nasatv_live.m3u8
+Dikirim ke app:      https://websaya.com/s/nasatv?token=<token>
+```
+
+**Mekanisme — 302 redirect (rekomendasi, murah):**
+1. `/v1/sync` mengembalikan URL proxy ber-token untuk tiap channel yang berhak.
+2. Player membuka `https://websaya.com/s/{channel}?token=…`.
+3. Endpoint **validasi token** (tanda tangan + kedaluwarsa + device tidak banned + berhak atas channel) → balas **HTTP 302** ke URL asli.
+4. Player lanjut ke URL asli; segmen HLS/DASH mengalir **langsung dari origin** → hemat bandwidth server.
+
+**Token:** ditandatangani (HMAC/JWT) berisi `channelId + deviceId + exp`, diterbitkan saat `/v1/sync`. Stateless → endpoint redirect tak perlu query DB tiap request (skalabel).
+- **TTL** cukup panjang untuk sesi live (mis. 12–24 jam): setelah redirect pertama, reload manifest live diarahkan player langsung ke origin, jadi endpoint proxy praktis hanya kena sekali. Tiap buka app, token di-refresh oleh `/v1/sync`.
+- Channel paid untuk device free: token tidak diterbitkan → URL proxy pun tidak ada (selaras §7).
+- Banned/expired bisa langsung memutus karena token cepat kedaluwarsa & tidak di-refresh (atau tambah cek DB ringan saat redirect bila perlu revoke instan).
+
+**Trade-off & opsi:**
+- **302 redirect (default):** murah, URL asli hilang dari playlist/app & butuh token valid. Kekurangan: URL asli tetap terlihat di inspeksi jaringan **setelah** redirect.
+- **Reverse proxy penuh (opsional, per-channel):** server mem-fetch + me-relay konten dan **menulis ulang URL segmen** → URL asli benar-benar tersembunyi, tapi **seluruh bandwidth video lewat server** (mahal + latensi). Pakai hanya untuk channel proteksi tinggi.
+- **Header khusus** (Referer/User-Agent) tetap dikirim player ke origin saat 302; untuk reverse proxy, header disuntik server.
 
 ## 8. Perubahan di App Android (UX)
 
@@ -94,10 +119,10 @@ Halaman sederhana: **paket & harga**, **cara berlangganan**, tombol **"Chat Admi
 - **Audit log** aktivasi.
 
 ## 11. Keamanan & anti-abuse
-1. **URL channel paid tidak pernah dikirim ke device free** (Β§7) — paling krusial.
+1. **Semua URL stream di-proxy ber-token (§7.1)** — URL asli tak pernah dikirim ke app; channel paid untuk device free bahkan tanpa token sama sekali. Paling krusial.
 2. **Token device** terbitan server saat registrasi (dikirim tiap request) → kurangi spoofing Device ID.
 3. **Cache entitlement + grace** kalau backend mati (pakai status terakhir s/d X jam, lalu turun ke free).
-4. **(Lanjutan)** signed/expiring stream URL agar link tak bisa dibagikan; deteksi pemakaian bersamaan.
+4. Token stream **bertanda tangan & cepat kedaluwarsa** agar link tak bisa dibagikan (§7.1); (lanjutan) deteksi pemakaian bersamaan.
 5. **Reminder legalitas konten**: jual akses konten harus berlisensi.
 
 ## 12. Tambahan yang disarankan
@@ -111,10 +136,11 @@ Halaman sederhana: **paket & harga**, **cara berlangganan**, tombol **"Chat Admi
 - **Backend + DB:** **Supabase** (Postgres + REST otomatis + auth + RLS). Alternatif: Node (NestJS) + Postgres di VPS.
 - **Dashboard admin:** Next.js (atau awalnya Supabase Studio).
 - **Website langganan:** statis (Vercel/Netlify/GitHub Pages).
+- **Endpoint proxy `/s` (§7.1):** paling pas di **edge** — Cloudflare Worker / Supabase Edge Function (murah, global, latensi rendah, cocok untuk 302 + verifikasi HMAC).
 - **App:** integrasi via Retrofit/OkHttp (OkHttp sudah ada).
 
 ## 14. Fase pengerjaan
-1. **Fase 1 — Backend + entitlement:** DB, `/v1/sync`, registrasi device + trial 1 jam, katalog channel free/paid, enforcement URL.
+1. **Fase 1 — Backend + entitlement:** DB, `/v1/sync`, registrasi device + trial 1 jam, katalog channel free/paid, **endpoint proxy `/s` + token bertanda tangan (§7.1)**, enforcement URL.
 2. **Fase 2 — Integrasi app:** chip status, tombol berlangganan, channel terkunci + promo video, WebView, Device ID di Settings.
 3. **Fase 3 — Dashboard admin:** kelola user/channel + aktivasi manual + import M3U.
 4. **Fase 4 — Website + hardening:** halaman langganan + WA, token device, cache/grace, notifikasi, analitik.
@@ -126,3 +152,4 @@ Halaman sederhana: **paket & harga**, **cara berlangganan**, tombol **"Chat Admi
 4. **Video promo:** satu video umum, atau beda per channel?
 5. **Konten paid sudah berlisensi?** (prasyarat jualan).
 6. URL website + nomor WhatsApp admin (untuk di-config).
+7. **Mode proxy stream (§7.1):** 302 redirect (murah, rekomendasi) atau reverse proxy penuh (sembunyikan total, mahal bandwidth)? + domain proxy yang dipakai (mis. `websaya.com`).
