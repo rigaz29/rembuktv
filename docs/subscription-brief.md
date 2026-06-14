@@ -74,12 +74,12 @@ Semua URL stream (`.m3u8` / `.mpd`) **tidak pernah dikirim apa adanya** ke app. 
 
 ```
 DB (asli, rahasia):  https://stream.nasatv.com.mk/hls/nasatv_live.m3u8
-Dikirim ke app:      https://api.rembuktv.my.id/s/nasatv?token=<token>
+Dikirim ke app:      https://api.enyak.my.id/s/nasatv?token=<token>
 ```
 
 **Mekanisme — 302 redirect (rekomendasi, murah):**
 1. `/v1/sync` mengembalikan URL proxy ber-token untuk tiap channel yang berhak.
-2. Player membuka `https://api.rembuktv.my.id/s/{channel}?token=…`.
+2. Player membuka `https://api.enyak.my.id/s/{channel}?token=…`.
 3. Endpoint **validasi token** (tanda tangan + kedaluwarsa + device tidak banned + berhak atas channel) → balas **HTTP 302** ke URL asli.
 4. Player lanjut ke URL asli; segmen HLS/DASH mengalir **langsung dari origin** → hemat bandwidth server.
 
@@ -130,7 +130,7 @@ Admin **hanya menempel URL asli** + atur metadata; URL server & token dikerjakan
 - **Otomatis backend:** simpan URL asli sebagai rahasia (`stream_url`); saat `/v1/sync`, buat **URL proxy + token** per-device (§7.1); tipe stream dideteksi dari URL.
 - **Tidak diatur per channel:** token (dinamis per-device/waktu) & domain proxy (config global).
 
-Contoh: admin ketik `https://stream.nasatv.com.mk/hls/nasatv_live.m3u8` → app menerima `https://api.rembuktv.my.id/s/nasatv?token=<unik per device>`.
+Contoh: admin ketik `https://stream.nasatv.com.mk/hls/nasatv_live.m3u8` → app menerima `https://api.enyak.my.id/s/nasatv?token=<unik per device>`.
 
 ## 11. Keamanan & anti-abuse
 1. **Semua URL stream di-proxy ber-token (§7.1)** — URL asli tak pernah dikirim ke app; channel paid untuk device free bahkan tanpa token sama sekali. Paling krusial.
@@ -174,7 +174,7 @@ Dipilih: **shared web hosting** — termurah & cukup untuk semua kebutuhan brief
 4. **Video promo:** satu video umum untuk semua channel paid (URL via config).
 5. **Legalitas konten:** legal — tidak mengambil dari IPTV berbayar mana pun.
 6. **Config:**
-   - Website langganan: `https://rembuktv.my.id` (halaman langganan).
+   - Website langganan: `https://enyak.my.id` (halaman langganan).
    - Nomor WhatsApp: **tidak** disimpan di app — tombol Chat Admin ada di dalam website (WebView).
    - URL video promo: menyusul.
-7. **Proxy stream:** 302 redirect; domain proxy `https://api.rembuktv.my.id`.
+7. **Proxy stream:** 302 redirect; domain proxy `https://api.enyak.my.id`.
