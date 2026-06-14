@@ -18,7 +18,7 @@ import timber.log.Timber
 import javax.inject.Inject
 
 @HiltAndroidApp
-class LiveTvApp : Application(), SingletonImageLoader.Factory {
+class RembukTvApp : Application(), SingletonImageLoader.Factory {
 
     @Inject lateinit var playlistDao: PlaylistSourceDao
     @Inject lateinit var repository: PlaylistRepository

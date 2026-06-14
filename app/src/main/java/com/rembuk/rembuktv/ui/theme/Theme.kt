@@ -32,7 +32,7 @@ private val LightColors = lightColorScheme(
 )
 
 @Composable
-fun LiveTvTheme(
+fun RembukTvTheme(
     themeMode: ThemeMode,
     content: @Composable () -> Unit,
 ) {

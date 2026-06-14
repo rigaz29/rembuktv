@@ -21,13 +21,13 @@ import com.rembuk.rembuktv.data.local.entity.PlaylistSourceEntity
     version = 2,
     exportSchema = false,
 )
-abstract class LiveTvDatabase : RoomDatabase() {
+abstract class RembukTvDatabase : RoomDatabase() {
     abstract fun playlistSourceDao(): PlaylistSourceDao
     abstract fun channelDao(): ChannelDao
     abstract fun favoriteDao(): FavoriteDao
     abstract fun historyDao(): HistoryDao
 
     companion object {
-        const val NAME = "livetv.db"
+        const val NAME = "rembuktv.db"
     }
 }

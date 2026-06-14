@@ -94,7 +94,7 @@ class PlaybackService : MediaSessionService() {
     private fun createDataSourceFactory(): DataSource.Factory {
         // Factory for HTTP requests with a standard User-Agent to prevent server rejection
         val httpFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("LiveTV/1.0 (Android)")
+            .setUserAgent("RembukTV/1.0 (Android)")
             .setAllowCrossProtocolRedirects(true)
 
         // Functional interface implementation for DataSource.Factory that injects headers

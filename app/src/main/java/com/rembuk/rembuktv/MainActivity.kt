@@ -25,7 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rembuk.rembuktv.core.isTelevision
 import com.rembuk.rembuktv.ui.AppRoot
 import com.rembuk.rembuktv.ui.RootViewModel
-import com.rembuk.rembuktv.ui.theme.LiveTvTheme
+import com.rembuk.rembuktv.ui.theme.RembukTvTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -62,7 +62,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by rootViewModel.themeMode.collectAsStateWithLifecycle()
             val inPip by isInPip
-            LiveTvTheme(themeMode) {
+            RembukTvTheme(themeMode) {
                 AppRoot(
                     isTv = isTv,
                     isInPip = inPip,

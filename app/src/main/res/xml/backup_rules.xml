@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <!-- Back up only DataStore prefs. Anything not included is excluded automatically,
-         so the Room cache (livetv.db) is left out and regenerated on launch. -->
+         so the Room cache (rembuktv.db) is left out and regenerated on launch. -->
     <include domain="file" path="datastore/" />
 </full-backup-content>
