@@ -140,12 +140,17 @@ Contoh: admin ketik `https://stream.nasatv.com.mk/hls/nasatv_live.m3u8` → app 
 - **Tampilkan Device ID** di app (Settings) supaya user bisa kirim ke admin saat aktivasi.
 - **Pembayaran manual = MVP yang tepat** (chat admin + QRIS statis). Integrasi PSP/QRIS otomatis menyusul.
 
-## 13. Rekomendasi tech stack
-- **Backend + DB:** **Supabase** (Postgres + REST otomatis + auth + RLS). Alternatif: Node (NestJS) + Postgres di VPS.
-- **Dashboard admin:** Next.js (atau awalnya Supabase Studio).
-- **Website langganan:** statis (Vercel/Netlify/GitHub Pages).
-- **Endpoint proxy `/s` (§7.1):** paling pas di **edge** — Cloudflare Worker / Supabase Edge Function (murah, global, latensi rendah, cocok untuk 302 + verifikasi HMAC).
+## 13. Tech stack (backend: **shared hosting**)
+Dipilih: **shared web hosting** — termurah & cukup untuk semua kebutuhan brief ini (model proxy 302).
+- **Backend + DB:** **PHP (Laravel) + MySQL** di shared hosting.
+- **Dashboard admin:** web PHP (Laravel/Blade) di hosting yang sama (atau frontend statis + API).
+- **Website langganan:** halaman statis, bisa di hosting yang sama.
+- **Endpoint proxy `/s` (§7.1):** PHP `header("Location: …")` (302) di hosting yang sama. Karena video **tidak lewat server** (cuma redirect), bandwidth shared hosting sanggup.
 - **App:** integrasi via Retrofit/OkHttp (OkHttp sudah ada).
+
+**Batasan & jalur skala:**
+- Shared hosting cukup untuk MVP. Hindari **reverse proxy penuh** (relay video) di shared hosting — ada batas `max_execution_time`/CPU/fair-use.
+- Jika nanti butuh sembunyikan URL total atau trafik besar → pindahkan **hanya bagian itu** ke **VPS / Cloudflare Worker**; sisanya tetap di shared hosting. Bila pemakaian membesar, pindah penuh ke VPS.
 
 ## 14. Fase pengerjaan
 1. **Fase 1 — Backend + entitlement:** DB, `/v1/sync`, registrasi device + trial 1 jam, katalog channel free/paid, **endpoint proxy `/s` + token bertanda tangan (§7.1)**, enforcement URL.
@@ -156,7 +161,7 @@ Contoh: admin ketik `https://stream.nasatv.com.mk/hls/nasatv_live.m3u8` → app 
 ## 15. Keputusan yang perlu dikonfirmasi
 1. **Unit langganan: per-Device ID** (1 bayar = 1 device)? (multi-device butuh sistem akun).
 2. **Katalog channel sepenuhnya dari backend** — masih izinkan user tambah playlist sendiri, atau hapus untuk produk berbayar?
-3. **Tech stack backend:** Supabase (rekomendasi) atau Node+VPS?
+3. ~~Tech stack backend~~ → **DIPUTUSKAN: shared hosting (PHP/Laravel + MySQL)** (lihat §13).
 4. **Video promo:** satu video umum, atau beda per channel?
 5. **Konten paid sudah berlisensi?** (prasyarat jualan).
 6. URL website + nomor WhatsApp admin (untuk di-config).
