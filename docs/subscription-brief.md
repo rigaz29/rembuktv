@@ -118,6 +118,14 @@ Halaman sederhana: **paket & harga**, **cara berlangganan**, tombol **"Chat Admi
 - **Kelola channel:** CRUD, set **free/paid**, kategori, logo, stream URL, urutan, enable/disable, **import M3U/JSON** (manfaatkan parser yang sudah ada).
 - **Audit log** aktivasi.
 
+### 10.1 Alur admin menambah channel
+Admin **hanya menempel URL asli** + atur metadata; URL server & token dikerjakan backend otomatis.
+- **Input admin:** URL asli (`.m3u8`/`.mpd`), nama, logo, kategori, **free/paid**, (opsional) header khusus/DRM.
+- **Otomatis backend:** simpan URL asli sebagai rahasia (`stream_url`); saat `/v1/sync`, buat **URL proxy + token** per-device (§7.1); tipe stream dideteksi dari URL.
+- **Tidak diatur per channel:** token (dinamis per-device/waktu) & domain proxy (config global).
+
+Contoh: admin ketik `https://stream.nasatv.com.mk/hls/nasatv_live.m3u8` → app menerima `https://websaya.com/s/nasatv?token=<unik per device>`.
+
 ## 11. Keamanan & anti-abuse
 1. **Semua URL stream di-proxy ber-token (§7.1)** — URL asli tak pernah dikirim ke app; channel paid untuk device free bahkan tanpa token sama sekali. Paling krusial.
 2. **Token device** terbitan server saat registrasi (dikirim tiap request) → kurangi spoofing Device ID.
