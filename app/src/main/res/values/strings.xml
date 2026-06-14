@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Rembuk TV</string>
+
+    <!-- Playback / notification -->
+    <string name="playback_channel_name">Playback</string>
+    <string name="now_playing">Sedang diputar</string>
+
+    <!-- Generic -->
+    <string name="retry">Coba lagi</string>
+    <string name="cancel">Batal</string>
+    <string name="ok">OK</string>
+    <string name="search_hint">Cari channel…</string>
+</resources>
