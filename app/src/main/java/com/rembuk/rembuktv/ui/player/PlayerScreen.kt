@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -79,6 +81,7 @@ fun PlayerScreen(
     var controlsVisible by remember { mutableStateOf(true) }
     var showTracks by remember { mutableStateOf(false) }
     var showSleep by remember { mutableStateOf(false) }
+    var isFullscreen by remember { mutableStateOf(false) }
 
     // TV focus: the root captures D-pad keys while controls are hidden; when controls
     // show, focus jumps to play/pause so the remote drives the on-screen buttons.
@@ -110,7 +113,12 @@ fun PlayerScreen(
             onToggle = viewModel::togglePlayPause,
         )
     }
-    DisposableEffect(Unit) { onDispose { context.asMainActivity()?.clearPipState() } }
+    DisposableEffect(Unit) {
+        onDispose {
+            context.asMainActivity()?.clearPipState()
+            context.asMainActivity()?.setFullscreen(false)
+        }
+    }
 
     // Auto-hide controls.
     LaunchedEffect(controlsVisible, state.isPlaying) {
@@ -220,6 +228,12 @@ fun PlayerScreen(
                 onResize = viewModel::cycleResizeMode,
                 onTracks = { showTracks = true },
                 onSleep = { showSleep = true },
+                showFullscreen = !isTv,
+                isFullscreen = isFullscreen,
+                onToggleFullscreen = {
+                    isFullscreen = !isFullscreen
+                    context.asMainActivity()?.setFullscreen(isFullscreen)
+                },
             )
         }
     }
@@ -255,6 +269,9 @@ private fun PlayerControls(
     onResize: () -> Unit,
     onTracks: () -> Unit,
     onSleep: () -> Unit,
+    showFullscreen: Boolean,
+    isFullscreen: Boolean,
+    onToggleFullscreen: () -> Unit,
 ) {
     val scrim = Color.Black.copy(alpha = 0.45f)
     Box(Modifier.fillMaxSize().background(scrim)) {
@@ -327,6 +344,13 @@ private fun PlayerControls(
             ControlIcon(Icons.Filled.Subtitles, "Track & subtitle", onTracks)
             ControlIcon(Icons.Filled.AspectRatio, "Mode layar", onResize)
             ControlIcon(Icons.Filled.Bedtime, "Sleep timer", onSleep)
+            if (showFullscreen) {
+                ControlIcon(
+                    if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                    "Layar penuh",
+                    onToggleFullscreen,
+                )
+            }
         }
     }
 }

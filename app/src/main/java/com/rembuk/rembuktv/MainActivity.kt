@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
@@ -21,6 +22,9 @@ import androidx.annotation.RequiresApi
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rembuk.rembuktv.core.isTelevision
 import com.rembuk.rembuktv.ui.AppRoot
@@ -91,6 +95,22 @@ class MainActivity : ComponentActivity() {
     fun clearPipState() {
         pipEnabled = false
         onPipToggle = null
+    }
+
+    /** Toggle landscape fullscreen + immersive system bars (phone). Called from the player. */
+    fun setFullscreen(on: Boolean) {
+        requestedOrientation = if (on) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+        val insets = WindowCompat.getInsetsController(window, window.decorView)
+        if (on) {
+            insets.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            insets.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            insets.show(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     override fun onUserLeaveHint() {

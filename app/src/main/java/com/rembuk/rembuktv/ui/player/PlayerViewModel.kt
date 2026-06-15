@@ -10,14 +10,16 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.session.MediaController
+import androidx.media3.exoplayer.ExoPlayer
 import com.rembuk.rembuktv.core.Constants
 import com.rembuk.rembuktv.core.NetworkMonitor
 import com.rembuk.rembuktv.domain.model.Channel
 import com.rembuk.rembuktv.domain.repository.PlaylistRepository
 import com.rembuk.rembuktv.domain.repository.SettingsRepository
+import com.rembuk.rembuktv.player.ClearKeyRegistry
+import com.rembuk.rembuktv.player.ExoPlayerFactory
 import com.rembuk.rembuktv.player.MediaItemFactory
-import com.rembuk.rembuktv.player.PlaybackConnection
+import com.rembuk.rembuktv.player.PlaybackHeaders
 import com.rembuk.rembuktv.ui.navigation.Routes
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -25,6 +27,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -40,7 +43,7 @@ class PlayerViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: PlaylistRepository,
     private val settingsRepository: SettingsRepository,
-    private val connection: PlaybackConnection,
+    private val playerFactory: ExoPlayerFactory,
     private val networkMonitor: NetworkMonitor,
 ) : ViewModel() {
 
@@ -56,7 +59,7 @@ class PlayerViewModel @Inject constructor(
     private val _player = MutableStateFlow<Player?>(null)
     val player: StateFlow<Player?> = _player.asStateFlow()
 
-    private var controller: MediaController? = null
+    private var controller: ExoPlayer? = null
 
     /** Channels used for prev/next zapping, scoped to the browsed category when set. */
     private var channelList: List<Channel> = emptyList()
@@ -83,19 +86,21 @@ class PlayerViewModel @Inject constructor(
             connect()
         }
         observeNetwork()
+        observeAbrCap()
     }
 
     private suspend fun connect() {
-        val ctrl = runCatching { connection.connect() }.getOrElse {
-            Timber.e(it, "Failed to connect MediaController")
+        val bufferProfile = settingsRepository.settings.first().bufferProfile
+        val exo = runCatching { playerFactory.create(bufferProfile) }.getOrElse {
+            Timber.e(it, "Failed to create player")
             _uiState.update {
                 it.copy(error = PlaybackErrorInfo("Gagal memulai pemutar.", manualRetryable = true))
             }
             return
         }
-        controller = ctrl
-        ctrl.addListener(listener)
-        _player.value = ctrl
+        controller = exo
+        exo.addListener(listener)
+        _player.value = exo
         val channel = repository.getChannel(initialChannelId)
         if (channel != null) {
             play(channel)
@@ -229,6 +234,20 @@ class PlayerViewModel @Inject constructor(
                 val shouldRetry = status.isOnline &&
                     (state.reconnecting || state.error?.manualRetryable == true)
                 if (shouldRetry) retry()
+            }
+        }
+    }
+
+    /** Cap adaptive bitrate on metered networks (moved from the old playback service). */
+    private fun observeAbrCap() {
+        viewModelScope.launch {
+            combine(networkMonitor.status, settingsRepository.settings) { net, settings ->
+                if (settings.capBitrateOnCellular && net.isMetered) settings.maxCellularBitrate.toInt() else Int.MAX_VALUE
+            }.collect { maxBitrate ->
+                controller?.let { p ->
+                    p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+                        .setMaxVideoBitrate(maxBitrate).build()
+                }
             }
         }
     }
@@ -397,6 +416,8 @@ class PlayerViewModel @Inject constructor(
             release()
         }
         controller = null
+        PlaybackHeaders.clear()
+        ClearKeyRegistry.clear()
         super.onCleared()
     }
 
