@@ -1,6 +1,9 @@
 package com.rembuk.rembuktv.core
 
 object Constants {
+    /** Subscription backend base URL (Fase 2). No trailing slash. */
+    const val API_BASE_URL = "https://api.enyak.my.id"
+
     /** Default JSON playlist URL placeholder shown in Settings. Replace with your repo. */
     const val DEFAULT_JSON_PLAYLIST_URL =
         "https://raw.githubusercontent.com/USERNAME/REPO/main/playlist.json"
