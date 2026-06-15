@@ -1,6 +1,9 @@
 package com.rembuk.rembuktv.data.repository
 
+import android.content.Context
 import com.rembuk.rembuktv.core.Constants
+import com.rembuk.rembuktv.core.DeviceId
+import com.rembuk.rembuktv.data.local.EntitlementStore
 import com.rembuk.rembuktv.data.local.dao.ChannelDao
 import com.rembuk.rembuktv.data.local.dao.FavoriteDao
 import com.rembuk.rembuktv.data.local.dao.HistoryDao
@@ -12,14 +15,21 @@ import com.rembuk.rembuktv.data.local.toDomain
 import com.rembuk.rembuktv.data.local.toEntity
 import com.rembuk.rembuktv.data.parser.JsonPlaylistParser
 import com.rembuk.rembuktv.data.parser.M3uPlaylistParser
+import com.rembuk.rembuktv.data.remote.BackendApi
 import com.rembuk.rembuktv.data.remote.RemotePlaylistDataSource
+import com.rembuk.rembuktv.data.remote.dto.SyncResponseDto
 import com.rembuk.rembuktv.domain.model.Channel
+import com.rembuk.rembuktv.domain.model.Entitlement
+import com.rembuk.rembuktv.domain.model.EntitlementStatus
 import com.rembuk.rembuktv.domain.model.PlaylistSource
 import com.rembuk.rembuktv.domain.model.PlaylistType
+import com.rembuk.rembuktv.domain.model.RemoteConfig
 import com.rembuk.rembuktv.domain.repository.PlaylistRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import timber.log.Timber
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,7 +42,61 @@ class PlaylistRepositoryImpl @Inject constructor(
     private val remote: RemotePlaylistDataSource,
     private val jsonParser: JsonPlaylistParser,
     private val m3uParser: M3uPlaylistParser,
+    private val backend: BackendApi,
+    private val store: EntitlementStore,
+    @ApplicationContext private val context: Context,
 ) : PlaylistRepository {
+
+    // --- Subscription backend ---
+
+    override suspend fun sync(appVersion: String): Result<Unit> = runCatching {
+        val deviceId = DeviceId.get(context)
+        val resp = backend.sync(deviceId, appVersion, store.catalogVersion())
+        store.saveEntitlement(resp.toEntitlement())
+        store.saveConfig(
+            RemoteConfig(resp.config.websiteUrl, resp.config.promoVideoUrl, resp.config.minAppVersion),
+        )
+        val channels = resp.channels
+        if (channels != null) {
+            val pid = catalogPlaylistId()
+            val entities = channels.mapIndexed { index, dto -> dto.toDomain(pid).toEntity(index) }
+            channelDao.replacePlaylistChannels(pid, entities)
+            store.saveCatalogVersion(resp.catalogVersion)
+            Timber.d("Synced %d channels (status=%s)", channels.size, resp.status)
+        }
+    }.onFailure { Timber.w(it, "Backend sync failed (using cached entitlement/catalog)") }
+
+    override fun observeEntitlement(): Flow<Entitlement> = store.observeEntitlement()
+
+    override fun observeRemoteConfig(): Flow<RemoteConfig> = store.observeConfig()
+
+    /** The single playlist_sources row that holds the backend catalog (created on demand). */
+    private suspend fun catalogPlaylistId(): Long {
+        playlistDao.getEnabled().firstOrNull()?.let { return it.id }
+        return playlistDao.insert(
+            PlaylistSourceEntity(
+                name = "Rembuk TV",
+                url = Constants.API_BASE_URL,
+                type = PlaylistType.M3U.name,
+                enabled = true,
+            ),
+        )
+    }
+
+    private fun SyncResponseDto.toEntitlement(): Entitlement {
+        val st = when (status.lowercase()) {
+            "trial" -> EntitlementStatus.TRIAL
+            "premium" -> EntitlementStatus.PREMIUM
+            "banned" -> EntitlementStatus.BANNED
+            else -> EntitlementStatus.FREE
+        }
+        return Entitlement(
+            status = st,
+            entitled = entitled,
+            expiresAtEpochMs = expiresAt?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() },
+            serverNowEpochMs = serverTime?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() },
+        )
+    }
 
     // --- Playlist sources ---
 

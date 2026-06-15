@@ -2,6 +2,8 @@ package com.rembuk.rembuktv.data.local
 
 import com.rembuk.rembuktv.data.local.entity.ChannelEntity
 import com.rembuk.rembuktv.data.local.entity.PlaylistSourceWithCount
+import com.rembuk.rembuktv.data.remote.dto.ChannelDto
+import com.rembuk.rembuktv.data.remote.dto.DrmDto
 import com.rembuk.rembuktv.domain.model.Channel
 import com.rembuk.rembuktv.domain.model.DrmInfo
 import com.rembuk.rembuktv.domain.model.PlaylistSource
@@ -21,6 +23,8 @@ fun ChannelEntity.toDomain(): Channel = Channel(
     },
     tvgId = tvgId,
     headers = decodeHeaders(headers),
+    isFree = isFree,
+    locked = locked,
 )
 
 fun Channel.toEntity(sortIndex: Int): ChannelEntity = ChannelEntity(
@@ -37,7 +41,39 @@ fun Channel.toEntity(sortIndex: Int): ChannelEntity = ChannelEntity(
     tvgId = tvgId,
     sortIndex = sortIndex,
     headers = encodeHeaders(headers),
+    isFree = isFree,
+    locked = locked,
 )
+
+/** Map a backend channel DTO (from /v1/sync) into the domain model. */
+fun ChannelDto.toDomain(playlistId: Long): Channel = Channel(
+    id = id.toString(),
+    playlistId = playlistId,
+    name = name,
+    logoUrl = logoUrl,
+    group = group,
+    streamUrl = url.orEmpty(),          // "" when locked (no playable URL)
+    streamType = when (streamType?.lowercase()) {
+        "hls" -> StreamType.HLS
+        "dash" -> StreamType.DASH
+        else -> StreamType.OTHER
+    },
+    drm = drm?.toDomain(),
+    tvgId = null,
+    headers = headers ?: emptyMap(),
+    isFree = isFree,
+    locked = locked,
+)
+
+private fun DrmDto.toDomain(): DrmInfo? {
+    val keys = decodeClearKeys(clearkeys)
+    if (scheme.isNullOrBlank() && licenseUrl.isNullOrBlank() && keys.isEmpty()) return null
+    return DrmInfo(
+        scheme = scheme ?: if (keys.isNotEmpty()) "clearkey" else "",
+        licenseUrl = licenseUrl,
+        clearKeys = keys,
+    )
+}
 
 fun PlaylistSourceWithCount.toDomain(): PlaylistSource = PlaylistSource(
     id = id,

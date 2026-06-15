@@ -2,8 +2,8 @@ package com.rembuk.rembuktv.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rembuk.rembuktv.BuildConfig
 import com.rembuk.rembuktv.core.Constants
-import com.rembuk.rembuktv.domain.model.PlaylistType
 import com.rembuk.rembuktv.domain.model.ThemeMode
 import com.rembuk.rembuktv.domain.repository.PlaylistRepository
 import com.rembuk.rembuktv.domain.repository.SettingsRepository
@@ -34,17 +34,12 @@ class RootViewModel @Inject constructor(
     val resumeChannelId: StateFlow<String?> = _resumeChannelId.asStateFlow()
 
     init {
-        // Auto-refresh playlists every 3 hours (Constants.PLAYLIST_TTL_MILLIS). On launch
-        // we only hit the network when the cache is already older than the TTL, so
-        // reopening the app within the window stays instant/offline; after that we refresh
-        // on the interval for as long as the app keeps running. Room cache shows the UI
-        // immediately while each refresh happens.
+        // Sync with the backend on launch then on an interval to keep entitlement + catalog
+        // fresh. The Room/DataStore cache renders the UI immediately/offline meanwhile.
         viewModelScope.launch {
-            seedDefaultPlaylistIfNeeded()
-            playlistRepository.refreshStale(Constants.PLAYLIST_TTL_MILLIS, force = false)
             while (true) {
-                delay(Constants.PLAYLIST_TTL_MILLIS)
-                playlistRepository.refreshStale(Constants.PLAYLIST_TTL_MILLIS, force = true)
+                playlistRepository.sync(BuildConfig.VERSION_NAME)
+                delay(Constants.SYNC_INTERVAL_MILLIS)
             }
         }
         // Resolve the auto-resume target once at startup.
@@ -59,18 +54,5 @@ class RootViewModel @Inject constructor(
 
     fun consumeResume() {
         _resumeChannelId.value = null
-    }
-
-    /**
-     * Seed the bundled default playlist on first launch only. Guarded by a persisted flag so
-     * it is never re-added if the user later deletes it.
-     */
-    private suspend fun seedDefaultPlaylistIfNeeded() {
-        if (settingsRepository.settings.first().defaultPlaylistSeeded) return
-        playlistRepository.addPlaylist(
-            name = Constants.DEFAULT_PLAYLIST_NAME,
-            url = Constants.DEFAULT_PLAYLIST_URL,
-            type = PlaylistType.M3U,
-        ).onSuccess { settingsRepository.setDefaultPlaylistSeeded(true) }
     }
 }

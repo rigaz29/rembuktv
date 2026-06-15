@@ -18,7 +18,7 @@ import com.rembuk.rembuktv.data.local.entity.PlaylistSourceEntity
         FavoriteEntity::class,
         HistoryEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class RembukTvDatabase : RoomDatabase() {

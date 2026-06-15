@@ -15,6 +15,9 @@ object Constants {
     /** Playlist cache time-to-live: refresh automatically when older than this. */
     const val PLAYLIST_TTL_MILLIS = 3 * 60 * 60 * 1000L // 3 hours
 
+    /** How often the app re-syncs with the backend (entitlement + catalog). */
+    const val SYNC_INTERVAL_MILLIS = 15 * 60 * 1000L // 15 minutes
+
     const val HISTORY_LIMIT = 30
 
     /** Auto-retry tuning for playback errors. */

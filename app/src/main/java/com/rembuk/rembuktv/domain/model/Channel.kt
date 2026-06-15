@@ -16,6 +16,10 @@ data class Channel(
     val tvgId: String? = null,
     /** Custom HTTP headers required to play the stream (e.g. User-Agent, Referer). */
     val headers: Map<String, String> = emptyMap(),
+    /** From the subscription backend: this channel is free to watch. */
+    val isFree: Boolean = false,
+    /** Locked for the current device (paid channel + not entitled → no playable URL). */
+    val locked: Boolean = false,
 )
 
 enum class StreamType { DASH, HLS, OTHER }

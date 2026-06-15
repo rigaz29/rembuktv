@@ -43,9 +43,11 @@ data class ChannelEntity(
     val tvgId: String?,
     /** Preserves the original playlist ordering. */
     val sortIndex: Int,
-    /** Custom HTTP headers stored as a semi-colon separated string or JSON. 
+    /** Custom HTTP headers stored as a semi-colon separated string or JSON.
      * Format: "Key1:Value1|Key2:Value2" */
     val headers: String? = null,
+    val isFree: Boolean = false,
+    val locked: Boolean = false,
 )
 
 @Entity(tableName = "favorites")
