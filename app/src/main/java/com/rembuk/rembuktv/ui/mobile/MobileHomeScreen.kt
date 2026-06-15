@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,7 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,7 +35,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -45,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,29 +57,41 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rembuk.rembuktv.domain.model.Channel
+import com.rembuk.rembuktv.domain.model.Entitlement
 import com.rembuk.rembuktv.ui.ChannelsViewModel
 import com.rembuk.rembuktv.ui.common.ChannelLogo
 import com.rembuk.rembuktv.ui.common.LoadingState
 import com.rembuk.rembuktv.ui.common.MessageState
+import com.rembuk.rembuktv.ui.common.badgeColor
+import com.rembuk.rembuktv.ui.common.label
+import com.rembuk.rembuktv.ui.common.showSubscribeCta
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MobileHomeScreen(
     onChannelClick: (Channel, String?) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenPlaylists: () -> Unit,
+    onSubscribe: () -> Unit,
     viewModel: ChannelsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    // Zap within the category the user is currently browsing.
-    val onChannelClickInGroup: (Channel) -> Unit = { onChannelClick(it, state.selectedGroup) }
+    // Locked (paid) channels open the paywall; otherwise play within the browsed category.
+    val onChannelClickInGroup: (Channel) -> Unit = {
+        if (it.locked) onSubscribe() else onChannelClick(it, state.selectedGroup)
+    }
     var searchVisible by remember { mutableStateOf(false) }
     val searchFocus = remember { FocusRequester() }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Rembuk TV") },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Rembuk TV")
+                        Spacer(Modifier.width(8.dp))
+                        EntitlementBadge(state.entitlement, onClick = onSubscribe)
+                    }
+                },
                 actions = {
                     IconButton(onClick = {
                         searchVisible = !searchVisible
@@ -82,8 +99,8 @@ fun MobileHomeScreen(
                     }) {
                         Icon(Icons.Filled.Search, contentDescription = "Cari")
                     }
-                    IconButton(onClick = onOpenPlaylists) {
-                        Icon(Icons.Filled.PlaylistPlay, contentDescription = "Playlist")
+                    if (state.entitlement.showSubscribeCta()) {
+                        TextButton(onClick = onSubscribe) { Text("Langganan") }
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Pengaturan")
@@ -144,9 +161,9 @@ fun MobileHomeScreen(
                 state.channels.isEmpty() && state.favorites.isEmpty() && state.query.isBlank() ->
                     MessageState(
                         title = "Belum ada channel",
-                        subtitle = "Tarik untuk menyegarkan atau tambah playlist di menu.",
-                        actionLabel = "Tambah playlist",
-                        onAction = onOpenPlaylists,
+                        subtitle = "Tarik untuk menyegarkan, atau berlangganan untuk membuka semua channel.",
+                        actionLabel = "Berlangganan",
+                        onAction = onSubscribe,
                     )
                 else -> PullToRefreshBox(
                     isRefreshing = state.refreshing,
@@ -210,6 +227,23 @@ private fun ChannelGrid(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EntitlementBadge(entitlement: Entitlement, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        color = entitlement.badgeColor(),
+        shape = RoundedCornerShape(50),
+    ) {
+        Text(
+            entitlement.label(),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+        )
+    }
+}
+
 private fun androidx.compose.foundation.lazy.grid.LazyGridScope.fullSpan(
     content: @Composable () -> Unit,
 ) = item(span = { GridItemSpan(maxLineSpan) }) { content() }
@@ -268,6 +302,14 @@ private fun ChannelCard(
                     contentDescription = "Favorit",
                     tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
+                )
+            }
+            if (channel.locked) {
+                Icon(
+                    Icons.Filled.Lock,
+                    contentDescription = "Terkunci (premium)",
+                    tint = Color.White,
+                    modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).size(18.dp),
                 )
             }
         }

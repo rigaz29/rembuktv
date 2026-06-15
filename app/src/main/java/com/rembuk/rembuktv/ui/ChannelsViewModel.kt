@@ -2,8 +2,11 @@ package com.rembuk.rembuktv.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.rembuk.rembuktv.BuildConfig
 import com.rembuk.rembuktv.core.Constants
 import com.rembuk.rembuktv.domain.model.Channel
+import com.rembuk.rembuktv.domain.model.Entitlement
+import com.rembuk.rembuktv.domain.model.RemoteConfig
 import com.rembuk.rembuktv.domain.repository.PlaylistRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +28,8 @@ data class ChannelsUiState(
     val query: String = "",
     val selectedGroup: String? = null,
     val message: String? = null,
+    val entitlement: Entitlement = Entitlement.FREE,
+    val remoteConfig: RemoteConfig = RemoteConfig(),
 )
 
 @HiltViewModel
@@ -66,7 +71,12 @@ class ChannelsViewModel @Inject constructor(
         Filters(q, g, r, m)
     }
 
-    val uiState: StateFlow<ChannelsUiState> = combine(repos, filters) { r, f ->
+    private val subscription = combine(
+        repository.observeEntitlement(),
+        repository.observeRemoteConfig(),
+    ) { entitlement, config -> entitlement to config }
+
+    val uiState: StateFlow<ChannelsUiState> = combine(repos, filters, subscription) { r, f, sub ->
         val filtered = r.channels.filter { ch ->
             (f.group == null || ch.group == f.group) && matchesQuery(ch, f.query)
         }
@@ -81,6 +91,8 @@ class ChannelsViewModel @Inject constructor(
             query = f.query,
             selectedGroup = f.group,
             message = f.message,
+            entitlement = sub.first,
+            remoteConfig = sub.second,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChannelsUiState())
 
@@ -105,8 +117,8 @@ class ChannelsViewModel @Inject constructor(
         viewModelScope.launch {
             refreshing.value = true
             message.value = null
-            repository.refreshStale(Constants.PLAYLIST_TTL_MILLIS, force = true)
-                .onFailure { message.value = "Gagal memuat playlist. Menampilkan data tersimpan." }
+            repository.sync(BuildConfig.VERSION_NAME)
+                .onFailure { message.value = "Gagal memuat. Menampilkan data tersimpan." }
             refreshing.value = false
         }
     }

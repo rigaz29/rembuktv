@@ -74,7 +74,8 @@ class PlayerViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val all = repository.observeChannels().first()
+            // Only playable (unlocked) channels participate in prev/next zapping.
+            val all = repository.observeChannels().first().filter { !it.locked }
             val scoped = if (groupFilter.isNullOrBlank()) all else all.filter { it.group == groupFilter }
             channelList = scoped.ifEmpty { all }
             val resizeMode = settingsRepository.settings.first().defaultResizeMode

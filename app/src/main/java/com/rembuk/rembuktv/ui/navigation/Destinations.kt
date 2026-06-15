@@ -7,6 +7,7 @@ object Routes {
     const val HOME = "home"
     const val SETTINGS = "settings"
     const val PLAYLISTS = "playlists"
+    const val SUBSCRIBE = "subscribe"
 
     const val PLAYER_ARG_CHANNEL = "channelId"
     const val PLAYER_ARG_GROUP = "group"

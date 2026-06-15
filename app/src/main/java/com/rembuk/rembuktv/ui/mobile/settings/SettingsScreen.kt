@@ -1,6 +1,5 @@
 package com.rembuk.rembuktv.ui.mobile.settings
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,11 +23,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rembuk.rembuktv.core.DeviceId
 import com.rembuk.rembuktv.domain.model.BufferProfile
 import com.rembuk.rembuktv.domain.model.ThemeMode
 import com.rembuk.rembuktv.ui.SettingsViewModel
@@ -37,7 +39,6 @@ import com.rembuk.rembuktv.ui.SettingsViewModel
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onOpenPlaylists: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -92,11 +93,21 @@ fun SettingsScreen(
 
             HorizontalDivider()
             SectionHeader("Data")
-            ClickableRow(title = "Kelola playlist", onClick = onOpenPlaylists)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(onClick = viewModel::clearCache) { Text("Hapus cache") }
                 TextButton(onClick = viewModel::clearHistory) { Text("Hapus riwayat") }
             }
+
+            HorizontalDivider()
+            SectionHeader("Perangkat")
+            val context = LocalContext.current
+            val deviceId = remember { DeviceId.get(context) }
+            Text("Device ID (kirim ke admin untuk aktivasi)", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                deviceId,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -154,15 +165,6 @@ private fun SwitchRow(
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
-}
-
-@Composable
-private fun ClickableRow(title: String, onClick: () -> Unit) {
-    Text(
-        title,
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
-    )
 }
 
 private fun ThemeMode.label(): String = when (this) {

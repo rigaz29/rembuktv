@@ -1,7 +1,9 @@
 package com.rembuk.rembuktv.ui.tv
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,6 +16,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.MaterialTheme as M3Theme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text as M3Text
@@ -26,10 +31,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -37,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Button
 import androidx.tv.material3.Card
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
@@ -46,13 +54,16 @@ import com.rembuk.rembuktv.ui.ChannelsViewModel
 import com.rembuk.rembuktv.ui.common.ChannelLogo
 import com.rembuk.rembuktv.ui.common.LoadingState
 import com.rembuk.rembuktv.ui.common.MessageState
+import com.rembuk.rembuktv.ui.common.badgeColor
+import com.rembuk.rembuktv.ui.common.label
+import com.rembuk.rembuktv.ui.common.showSubscribeCta
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun TvHomeScreen(
     onChannelClick: (Channel, String?) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenPlaylists: () -> Unit,
+    onSubscribe: () -> Unit,
     viewModel: ChannelsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -64,6 +75,19 @@ fun TvHomeScreen(
             Column(Modifier.fillMaxSize().padding(horizontal = 48.dp, vertical = 28.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Rembuk TV", style = MaterialTheme.typography.headlineMedium)
+                    Spacer(Modifier.width(12.dp))
+                    Box(
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(state.entitlement.badgeColor())
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            state.entitlement.label(),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                        )
+                    }
                     state.selectedGroup?.let { group ->
                         Text(
                             "  •  $group",
@@ -72,19 +96,20 @@ fun TvHomeScreen(
                         )
                     }
                     Spacer(Modifier.weight(1f))
+                    if (state.entitlement.showSubscribeCta()) {
+                        Button(onClick = onSubscribe) { Text("Berlangganan") }
+                        Spacer(Modifier.width(12.dp))
+                    }
                     Button(onClick = {
                         searchVisible = !searchVisible
                         if (!searchVisible) viewModel.setQuery("")
                     }) { Text(if (searchVisible) "Tutup" else "Cari") }
-                    Spacer(Modifier.width(12.dp))
-                    Button(onClick = onOpenPlaylists) { Text("Playlist") }
                     Spacer(Modifier.width(12.dp))
                     Button(onClick = onOpenSettings) { Text("Pengaturan") }
                 }
 
                 if (searchVisible) {
                     Spacer(Modifier.height(12.dp))
-                    // Use a Material3 (non-TV) text field, dark-themed so it stays legible.
                     M3Theme(colorScheme = m3DarkColorScheme()) {
                         OutlinedTextField(
                             value = state.query,
@@ -104,11 +129,11 @@ fun TvHomeScreen(
                     state.channels.isEmpty() && state.favorites.isEmpty() && state.query.isBlank() ->
                         MessageState(
                             title = "Belum ada channel",
-                            subtitle = "Tambahkan playlist dari menu Playlist.",
-                            actionLabel = "Buka Playlist",
-                            onAction = onOpenPlaylists,
+                            subtitle = "Berlangganan untuk membuka semua channel.",
+                            actionLabel = "Berlangganan",
+                            onAction = onSubscribe,
                         )
-                    else -> ChannelRows(state, onChannelClick)
+                    else -> ChannelRows(state, onChannelClick, onSubscribe)
                 }
             }
         }
@@ -120,29 +145,29 @@ fun TvHomeScreen(
 private fun ChannelRows(
     state: com.rembuk.rembuktv.ui.ChannelsUiState,
     onChannelClick: (Channel, String?) -> Unit,
+    onSubscribe: () -> Unit,
 ) {
     val grouped = state.channels.groupBy { it.group?.takeIf { g -> g.isNotBlank() } ?: "Lainnya" }
     val searching = state.query.isNotBlank()
+    // Locked (paid) channels open the paywall; others play within their category.
+    fun open(channel: Channel, group: String?) {
+        if (channel.locked) onSubscribe() else onChannelClick(channel, group)
+    }
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(24.dp),
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
-        // Favorit/Baru ditonton span categories, so zap through all channels. Hidden while
-        // searching so the results stay focused on matches.
         if (!searching && state.favorites.isNotEmpty()) {
-            item { ChannelRow("Favorit", state.favorites) { onChannelClick(it, null) } }
+            item { ChannelRow("Favorit", state.favorites) { open(it, null) } }
         }
         if (!searching && state.history.isNotEmpty()) {
-            item { ChannelRow("Baru ditonton", state.history) { onChannelClick(it, null) } }
+            item { ChannelRow("Baru ditonton", state.history) { open(it, null) } }
         }
-        // Each group row is a category: zap within the channel's own group.
         grouped.forEach { (group, channels) ->
-            item { ChannelRow(group, channels) { onChannelClick(it, it.group) } }
+            item { ChannelRow(group, channels) { open(it, it.group) } }
         }
         if (grouped.isEmpty()) {
-            item {
-                Text("Tidak ada channel cocok.", style = MaterialTheme.typography.titleMedium)
-            }
+            item { Text("Tidak ada channel cocok.", style = MaterialTheme.typography.titleMedium) }
         }
     }
 }
@@ -185,11 +210,21 @@ private fun TvChannelCard(channel: Channel, onClick: () -> Unit) {
             .onFocusChanged { focused = it.isFocused },
     ) {
         Column(Modifier.width(168.dp)) {
-            ChannelLogo(
-                name = channel.name,
-                logoUrl = channel.logoUrl,
-                modifier = Modifier.fillMaxWidth().height(104.dp),
-            )
+            Box {
+                ChannelLogo(
+                    name = channel.name,
+                    logoUrl = channel.logoUrl,
+                    modifier = Modifier.fillMaxWidth().height(104.dp),
+                )
+                if (channel.locked) {
+                    Icon(
+                        Icons.Filled.Lock,
+                        contentDescription = "Terkunci (premium)",
+                        tint = Color.White,
+                        modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
+                    )
+                }
+            }
             Text(
                 channel.name,
                 style = MaterialTheme.typography.bodyMedium,

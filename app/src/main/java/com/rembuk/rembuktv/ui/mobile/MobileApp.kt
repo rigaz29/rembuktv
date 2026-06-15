@@ -8,7 +8,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.rembuk.rembuktv.ui.mobile.playlist.PlaylistScreen
+import com.rembuk.rembuktv.ui.SubscribeScreen
 import com.rembuk.rembuktv.ui.mobile.settings.SettingsScreen
 import com.rembuk.rembuktv.ui.navigation.NavFadeIn
 import com.rembuk.rembuktv.ui.navigation.NavFadeOut
@@ -34,7 +34,7 @@ fun MobileApp(navController: NavHostController, isInPip: Boolean) {
             MobileHomeScreen(
                 onChannelClick = { channel, group -> navController.navigate(Routes.player(channel.id, group)) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                onOpenPlaylists = { navController.navigate(Routes.PLAYLISTS) },
+                onSubscribe = { navController.navigate(Routes.SUBSCRIBE) },
             )
         }
         composable(
@@ -59,13 +59,10 @@ fun MobileApp(navController: NavHostController, isInPip: Boolean) {
             )
         }
         composable(Routes.SETTINGS) {
-            SettingsScreen(
-                onBack = { navController.popBackStack() },
-                onOpenPlaylists = { navController.navigate(Routes.PLAYLISTS) },
-            )
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
-        composable(Routes.PLAYLISTS) {
-            PlaylistScreen(onBack = { navController.popBackStack() })
+        composable(Routes.SUBSCRIBE) {
+            SubscribeScreen(onBack = { navController.popBackStack() })
         }
     }
 }
