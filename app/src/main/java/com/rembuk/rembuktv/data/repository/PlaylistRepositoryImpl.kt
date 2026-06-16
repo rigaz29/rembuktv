@@ -51,7 +51,9 @@ class PlaylistRepositoryImpl @Inject constructor(
 
     override suspend fun sync(appVersion: String): Result<Unit> = runCatching {
         val deviceId = DeviceId.get(context)
-        val resp = backend.sync(deviceId, appVersion, store.catalogVersion())
+        val deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}".trim()
+        val osVersion = "Android ${android.os.Build.VERSION.RELEASE}"
+        val resp = backend.sync(deviceId, appVersion, store.catalogVersion(), deviceModel, osVersion)
         store.saveEntitlement(resp.toEntitlement())
         store.saveConfig(
             RemoteConfig(resp.config.websiteUrl, resp.config.promoVideoUrl, resp.config.minAppVersion),

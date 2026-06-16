@@ -24,10 +24,22 @@ class BackendApi @Inject constructor(
     private val base = Constants.API_BASE_URL.trimEnd('/')
     private val mediaJson = "application/json; charset=utf-8".toMediaType()
 
-    suspend fun sync(deviceId: String, appVersion: String, catalogVersion: String?): SyncResponseDto =
+    suspend fun sync(
+        deviceId: String,
+        appVersion: String,
+        catalogVersion: String?,
+        deviceModel: String? = null,
+        osVersion: String? = null,
+    ): SyncResponseDto =
         withContext(Dispatchers.IO) {
             val payload = json.encodeToString(
-                SyncRequestDto(deviceId = deviceId, appVersion = appVersion, catalogVersion = catalogVersion),
+                SyncRequestDto(
+                    deviceId = deviceId,
+                    appVersion = appVersion,
+                    catalogVersion = catalogVersion,
+                    deviceModel = deviceModel,
+                    osVersion = osVersion,
+                ),
             )
             val request = Request.Builder()
                 .url("$base/v1/sync")

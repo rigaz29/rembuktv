@@ -9,6 +9,8 @@ data class SyncRequestDto(
     val deviceId: String,
     val appVersion: String,
     val catalogVersion: String? = null,
+    val deviceModel: String? = null,
+    val osVersion: String? = null,
 )
 
 /** Response of POST /v1/sync. */
