@@ -34,6 +34,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -222,6 +224,7 @@ fun PlayerScreen(
                 playPauseFocus = playPauseFocus,
                 onBack = onBack,
                 onPlayPause = viewModel::togglePlayPause,
+                onSeek = viewModel::seekTo,
                 onNext = viewModel::next,
                 onPrevious = viewModel::previous,
                 onToggleFavorite = viewModel::toggleFavorite,
@@ -263,6 +266,7 @@ private fun PlayerControls(
     playPauseFocus: FocusRequester,
     onBack: () -> Unit,
     onPlayPause: () -> Unit,
+    onSeek: (Long) -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -332,27 +336,84 @@ private fun PlayerControls(
             }
         }
 
-        // Bottom bar.
-        Row(
+        // Bottom area: seekbar (VOD only) + control buttons.
+        Column(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            ControlIcon(Icons.Filled.Subtitles, "Track & subtitle", onTracks)
-            ControlIcon(Icons.Filled.AspectRatio, "Mode layar", onResize)
-            ControlIcon(Icons.Filled.Bedtime, "Sleep timer", onSleep)
-            if (showFullscreen) {
-                ControlIcon(
-                    if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
-                    "Layar penuh",
-                    onToggleFullscreen,
+            if (state.isSeekable) {
+                SeekBar(
+                    positionMs = state.positionMs,
+                    durationMs = state.durationMs,
+                    onSeek = onSeek,
                 )
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ControlIcon(Icons.Filled.Subtitles, "Track & subtitle", onTracks)
+                ControlIcon(Icons.Filled.AspectRatio, "Mode layar", onResize)
+                ControlIcon(Icons.Filled.Bedtime, "Sleep timer", onSleep)
+                if (showFullscreen) {
+                    ControlIcon(
+                        if (isFullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                        "Layar penuh",
+                        onToggleFullscreen,
+                    )
+                }
             }
         }
     }
+}
+
+/** Seekbar for VOD (non-live) playback: current time, scrubber, total duration. */
+@Composable
+private fun SeekBar(
+    positionMs: Long,
+    durationMs: Long,
+    onSeek: (Long) -> Unit,
+) {
+    val duration = durationMs.coerceAtLeast(1L)
+    var scrubbing by remember { mutableStateOf(false) }
+    var scrubValue by remember { mutableStateOf(0f) }
+    val sliderValue = if (scrubbing) scrubValue else (positionMs.toFloat() / duration).coerceIn(0f, 1f)
+    val displayMs = if (scrubbing) (scrubValue * duration).toLong() else positionMs
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(formatTime(displayMs), color = Color.White, style = MaterialTheme.typography.labelSmall)
+        Slider(
+            value = sliderValue,
+            onValueChange = { scrubbing = true; scrubValue = it },
+            onValueChangeFinished = {
+                onSeek((scrubValue * duration).toLong())
+                scrubbing = false
+            },
+            colors = SliderDefaults.colors(
+                thumbColor = Color.White,
+                activeTrackColor = Color.White,
+                inactiveTrackColor = Color.White.copy(alpha = 0.3f),
+            ),
+            modifier = Modifier.weight(1f),
+        )
+        Text(formatTime(durationMs), color = Color.White, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+/** Formats milliseconds as m:ss, or h:mm:ss past an hour. */
+private fun formatTime(ms: Long): String {
+    val totalSec = (ms / 1000).coerceAtLeast(0)
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
 }
 
 @Composable

@@ -68,6 +68,7 @@ class PlayerViewModel @Inject constructor(
     private var retryCount = 0
     private var retryJob: Job? = null
     private var sleepJob: Job? = null
+    private var positionJob: Job? = null
 
     /** Maps a UI track-option id to the override needed to apply it. */
     private val videoOverrides = HashMap<String, TrackSelectionOverride>()
@@ -101,6 +102,7 @@ class PlayerViewModel @Inject constructor(
         controller = exo
         exo.addListener(listener)
         _player.value = exo
+        startPositionUpdates()
         val channel = repository.getChannel(initialChannelId)
         if (channel != null) {
             play(channel)
@@ -358,6 +360,45 @@ class PlayerViewModel @Inject constructor(
         if (ctrl.isPlaying) ctrl.pause() else { ctrl.prepare(); ctrl.play() }
     }
 
+    /** Seek within VOD content (no-op for live). */
+    fun seekTo(positionMs: Long) {
+        val dur = _uiState.value.durationMs
+        val target = if (dur > 0) positionMs.coerceIn(0L, dur) else positionMs.coerceAtLeast(0L)
+        controller?.seekTo(target)
+        _uiState.update { it.copy(positionMs = target) }
+    }
+
+    /**
+     * Polls position/duration ~2x/sec. Only emits the seekbar fields for non-live, seekable
+     * (VOD) content, so live channels keep [PlayerUiState.isSeekable] = false and never
+     * trigger seekbar recompositions.
+     */
+    private fun startPositionUpdates() {
+        positionJob?.cancel()
+        positionJob = viewModelScope.launch {
+            while (true) {
+                controller?.let { c ->
+                    val dur = c.duration
+                    val seekable = c.isCurrentMediaItemSeekable && !c.isCurrentMediaItemLive &&
+                        dur != C.TIME_UNSET && dur > 0L
+                    if (seekable) {
+                        _uiState.update {
+                            it.copy(
+                                isSeekable = true,
+                                durationMs = dur,
+                                positionMs = c.currentPosition.coerceAtLeast(0L),
+                                bufferedPositionMs = c.bufferedPosition.coerceAtLeast(0L),
+                            )
+                        }
+                    } else if (_uiState.value.isSeekable) {
+                        _uiState.update { it.copy(isSeekable = false) }
+                    }
+                }
+                delay(500)
+            }
+        }
+    }
+
     fun toggleFavorite() {
         val channel = _uiState.value.channel ?: return
         val newValue = !_uiState.value.isFavorite
@@ -410,6 +451,7 @@ class PlayerViewModel @Inject constructor(
     override fun onCleared() {
         retryJob?.cancel()
         sleepJob?.cancel()
+        positionJob?.cancel()
         controller?.run {
             stop()
             removeListener(listener)

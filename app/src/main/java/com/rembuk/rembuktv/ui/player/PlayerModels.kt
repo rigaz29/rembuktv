@@ -49,4 +49,9 @@ data class PlayerUiState(
     val isFavorite: Boolean = false,
     val hasNext: Boolean = false,
     val hasPrevious: Boolean = false,
+    /** True for non-live, seekable (VOD) content; drives the seekbar. */
+    val isSeekable: Boolean = false,
+    val durationMs: Long = 0L,
+    val positionMs: Long = 0L,
+    val bufferedPositionMs: Long = 0L,
 )
