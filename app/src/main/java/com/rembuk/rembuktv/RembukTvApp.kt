@@ -15,6 +15,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.net.CookieHandler
+import java.net.CookieManager
+import java.net.CookiePolicy
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -28,7 +31,20 @@ class RembukTvApp : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         if (BuildConfig.DEBUG) Timber.plant(Timber.DebugTree())
+        installCookieManager()
         appScope.launch { seedDefaultPlaylistIfEmpty() }
+    }
+
+    /**
+     * ExoPlayer's DefaultHttpDataSource (HttpURLConnection-based) honours the JVM default
+     * CookieHandler. Many tokenized CDNs (e.g. Akamai hdntl) hand the auth token to the
+     * manifest response as a session cookie that must be echoed on each segment request;
+     * without a cookie jar those segments 403. OkHttp ignores this, so /v1/sync is unaffected.
+     */
+    private fun installCookieManager() {
+        if (CookieHandler.getDefault() == null) {
+            CookieHandler.setDefault(CookieManager().apply { setCookiePolicy(CookiePolicy.ACCEPT_ORIGINAL_SERVER) })
+        }
     }
 
     /** Coil 3 needs a network fetcher explicitly registered for remote logos. */
