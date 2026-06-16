@@ -39,6 +39,7 @@ class SettingsRepositoryImpl @Inject constructor(
         val CAP_CELLULAR = booleanPreferencesKey("cap_cellular")
         val MAX_CELLULAR_BPS = longPreferencesKey("max_cellular_bps")
         val RESIZE_MODE = intPreferencesKey("resize_mode")
+        val GRID_COLUMNS = intPreferencesKey("grid_columns")
         val DEFAULT_PLAYLIST_SEEDED = booleanPreferencesKey("default_playlist_seeded")
     }
 
@@ -56,6 +57,7 @@ class SettingsRepositoryImpl @Inject constructor(
             capBitrateOnCellular = p[Keys.CAP_CELLULAR] ?: defaults.capBitrateOnCellular,
             maxCellularBitrate = p[Keys.MAX_CELLULAR_BPS] ?: defaults.maxCellularBitrate,
             defaultResizeMode = p[Keys.RESIZE_MODE] ?: defaults.defaultResizeMode,
+            gridColumns = p[Keys.GRID_COLUMNS] ?: defaults.gridColumns,
             defaultPlaylistSeeded = p[Keys.DEFAULT_PLAYLIST_SEEDED] ?: defaults.defaultPlaylistSeeded,
         )
     }
@@ -69,6 +71,7 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setCapBitrateOnCellular(enabled: Boolean) = edit { it[Keys.CAP_CELLULAR] = enabled }
     override suspend fun setMaxCellularBitrate(bps: Long) = edit { it[Keys.MAX_CELLULAR_BPS] = bps }
     override suspend fun setDefaultResizeMode(mode: Int) = edit { it[Keys.RESIZE_MODE] = mode }
+    override suspend fun setGridColumns(columns: Int) = edit { it[Keys.GRID_COLUMNS] = columns }
     override suspend fun setDefaultPlaylistSeeded(seeded: Boolean) = edit { it[Keys.DEFAULT_PLAYLIST_SEEDED] = seeded }
 
     private suspend inline fun edit(crossinline block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {

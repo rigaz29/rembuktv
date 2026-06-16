@@ -92,6 +92,15 @@ fun SettingsScreen(
             )
 
             HorizontalDivider()
+            SectionHeader("Tata letak")
+            Text("Jumlah kolom grid channel", style = MaterialTheme.typography.bodyMedium)
+            ChipRow(
+                options = listOf(0 to "Otomatis", 3 to "3", 4 to "4", 5 to "5", 6 to "6"),
+                selected = settings.gridColumns,
+                onSelect = viewModel::setGridColumns,
+            )
+
+            HorizontalDivider()
             SectionHeader("Data")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextButton(onClick = viewModel::clearCache) { Text("Hapus cache") }

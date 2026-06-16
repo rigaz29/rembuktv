@@ -8,11 +8,13 @@ import com.rembuk.rembuktv.domain.model.Channel
 import com.rembuk.rembuktv.domain.model.Entitlement
 import com.rembuk.rembuktv.domain.model.RemoteConfig
 import com.rembuk.rembuktv.domain.repository.PlaylistRepository
+import com.rembuk.rembuktv.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -30,11 +32,14 @@ data class ChannelsUiState(
     val message: String? = null,
     val entitlement: Entitlement = Entitlement.FREE,
     val remoteConfig: RemoteConfig = RemoteConfig(),
+    /** Channel grid columns; 0 = otomatis (adaptive). */
+    val gridColumns: Int = 0,
 )
 
 @HiltViewModel
 class ChannelsViewModel @Inject constructor(
     private val repository: PlaylistRepository,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
@@ -76,7 +81,9 @@ class ChannelsViewModel @Inject constructor(
         repository.observeRemoteConfig(),
     ) { entitlement, config -> entitlement to config }
 
-    val uiState: StateFlow<ChannelsUiState> = combine(repos, filters, subscription) { r, f, sub ->
+    private val gridColumns = settingsRepository.settings.map { it.gridColumns }
+
+    val uiState: StateFlow<ChannelsUiState> = combine(repos, filters, subscription, gridColumns) { r, f, sub, cols ->
         val filtered = r.channels.filter { ch ->
             (f.group == null || ch.group == f.group) && matchesQuery(ch, f.query)
         }
@@ -93,6 +100,7 @@ class ChannelsViewModel @Inject constructor(
             message = f.message,
             entitlement = sub.first,
             remoteConfig = sub.second,
+            gridColumns = cols,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ChannelsUiState())
 

@@ -27,6 +27,7 @@ class SettingsViewModel @Inject constructor(
     fun setAutoResume(enabled: Boolean) = launchEdit { settingsRepository.setAutoResume(enabled) }
     fun setBufferProfile(profile: BufferProfile) = launchEdit { settingsRepository.setBufferProfile(profile) }
     fun setCapCellular(enabled: Boolean) = launchEdit { settingsRepository.setCapBitrateOnCellular(enabled) }
+    fun setGridColumns(columns: Int) = launchEdit { settingsRepository.setGridColumns(columns) }
 
     fun clearCache() = launchEdit { playlistRepository.clearCache() }
     fun clearHistory() = launchEdit { playlistRepository.clearHistory() }

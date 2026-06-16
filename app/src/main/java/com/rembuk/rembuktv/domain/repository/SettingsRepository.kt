@@ -15,5 +15,6 @@ interface SettingsRepository {
     suspend fun setCapBitrateOnCellular(enabled: Boolean)
     suspend fun setMaxCellularBitrate(bps: Long)
     suspend fun setDefaultResizeMode(mode: Int)
+    suspend fun setGridColumns(columns: Int)
     suspend fun setDefaultPlaylistSeeded(seeded: Boolean)
 }
