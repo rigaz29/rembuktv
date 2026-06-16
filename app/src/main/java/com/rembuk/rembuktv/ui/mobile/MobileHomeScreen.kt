@@ -100,7 +100,7 @@ fun MobileHomeScreen(
                         Icon(Icons.Filled.Search, contentDescription = "Cari")
                     }
                     if (state.entitlement.showSubscribeCta()) {
-                        TextButton(onClick = onSubscribe) { Text("Langganan") }
+                        TextButton(onClick = onSubscribe) { Text("Donasi") }
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "Pengaturan")
@@ -161,8 +161,8 @@ fun MobileHomeScreen(
                 state.channels.isEmpty() && state.favorites.isEmpty() && state.query.isBlank() ->
                     MessageState(
                         title = "Belum ada channel",
-                        subtitle = "Tarik untuk menyegarkan, atau berlangganan untuk membuka semua channel.",
-                        actionLabel = "Berlangganan",
+                        subtitle = "Tarik untuk menyegarkan, atau berdonasi untuk membuka semua channel.",
+                        actionLabel = "Donasi",
                         onAction = onSubscribe,
                     )
                 else -> PullToRefreshBox(
@@ -189,7 +189,7 @@ private fun ChannelGrid(
 ) {
     val showRows = state.query.isBlank() && state.selectedGroup == null
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(112.dp),
+        columns = if (state.gridColumns > 0) GridCells.Fixed(state.gridColumns) else GridCells.Adaptive(112.dp),
         contentPadding = PaddingValues(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -307,7 +307,7 @@ private fun ChannelCard(
             if (channel.locked) {
                 Icon(
                     Icons.Filled.Lock,
-                    contentDescription = "Terkunci (premium)",
+                    contentDescription = "Terkunci (khusus donatur)",
                     tint = Color.White,
                     modifier = Modifier.align(Alignment.BottomStart).padding(6.dp).size(18.dp),
                 )

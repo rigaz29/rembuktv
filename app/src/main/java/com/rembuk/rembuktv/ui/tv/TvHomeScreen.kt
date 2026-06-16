@@ -96,8 +96,8 @@ fun TvHomeScreen(
                 state.channels.isEmpty() && state.favorites.isEmpty() && state.query.isBlank() ->
                     MessageState(
                         title = "Belum ada channel",
-                        subtitle = "Berlangganan untuk membuka semua channel.",
-                        actionLabel = "Berlangganan",
+                        subtitle = "Berdonasi untuk membuka semua channel.",
+                        actionLabel = "Donasi",
                         onAction = onSubscribe,
                     )
                 else -> {
@@ -154,7 +154,7 @@ fun TvHomeScreen(
                                 }
                                 Spacer(Modifier.width(12.dp))
                                 if (state.entitlement.showSubscribeCta()) {
-                                    Button(onClick = onSubscribe) { Text("Berlangganan") }
+                                    Button(onClick = onSubscribe) { Text("Donasi") }
                                     Spacer(Modifier.width(12.dp))
                                 }
                                 Button(onClick = {
@@ -190,7 +190,7 @@ fun TvHomeScreen(
                                 )
                             } else {
                                 LazyVerticalGrid(
-                                    columns = GridCells.Adaptive(184.dp),
+                                    columns = if (state.gridColumns > 0) GridCells.Fixed(state.gridColumns) else GridCells.Adaptive(184.dp),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                     verticalArrangement = Arrangement.spacedBy(16.dp),
                                     contentPadding = PaddingValues(bottom = 24.dp),
@@ -265,7 +265,7 @@ private fun TvChannelCard(channel: Channel, onClick: () -> Unit) {
                             .background(Color.Black.copy(alpha = 0.55f))
                             .padding(4.dp),
                     ) {
-                        Icon(Icons.Filled.Lock, contentDescription = "Terkunci (premium)", tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Filled.Lock, contentDescription = "Terkunci (khusus donatur)", tint = Color.White, modifier = Modifier.size(16.dp))
                     }
                 }
             }

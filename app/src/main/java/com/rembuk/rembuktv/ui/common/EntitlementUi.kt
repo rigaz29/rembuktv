@@ -4,9 +4,9 @@ import androidx.compose.ui.graphics.Color
 import com.rembuk.rembuktv.domain.model.Entitlement
 import com.rembuk.rembuktv.domain.model.EntitlementStatus
 
-/** Short label for the status chip, e.g. "Premium", "Trial 57m", "Gratis". */
+/** Short label for the status chip, e.g. "Donatur", "Trial 57m", "Gratis". */
 fun Entitlement.label(): String = when (status) {
-    EntitlementStatus.PREMIUM -> "Premium"
+    EntitlementStatus.PREMIUM -> "Donatur"
     EntitlementStatus.TRIAL -> "Trial" + (remainingMinutes()?.let { " ${it}m" } ?: "")
     EntitlementStatus.BANNED -> "Diblokir"
     EntitlementStatus.FREE -> "Gratis"
@@ -19,7 +19,7 @@ fun Entitlement.badgeColor(): Color = when (status) {
     EntitlementStatus.FREE -> Color(0xFF616161)    // grey
 }
 
-/** Whether to show a prominent "Berlangganan" CTA (anything other than active premium). */
+/** Whether to show a prominent "Donasi" CTA (anything other than active donatur). */
 fun Entitlement.showSubscribeCta(): Boolean = status != EntitlementStatus.PREMIUM
 
 /** Minutes left on the trial/subscription, or null when there is no expiry. */

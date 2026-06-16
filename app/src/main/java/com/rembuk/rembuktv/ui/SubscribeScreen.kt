@@ -22,7 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rembuk.rembuktv.ui.common.LoadingState
 
-/** In-app WebView for the subscription website (how to subscribe + chat admin). */
+/** In-app WebView for the donation website (how to donate + chat admin). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubscribeScreen(
@@ -34,7 +34,7 @@ fun SubscribeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Berlangganan") },
+                title = { Text("Donasi") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
