@@ -32,7 +32,7 @@ object AppModule {
             .retryOnConnectionFailure(true)
         if (BuildConfig.DEBUG) {
             builder.addInterceptor(
-                HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC },
+                HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY },
             )
         }
         return builder.build()

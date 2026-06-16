@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DEBUG-ONLY. Hanya dipakai oleh build debug (lewat src/debug AndroidManifest).
+  debug-overrides membuat build debug mempercayai CA yang diinstall user
+  (mis. mitmproxy / HTTP Toolkit / Charles / PCAPdroid) supaya HTTPS bisa di-sniff.
+  Build release TIDAK terpengaruh: file ini tidak ikut ke source set release.
+-->
+<network-security-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>
