@@ -16,17 +16,23 @@ interface ChannelDao {
         SELECT c.* FROM channels c
         INNER JOIN playlist_sources p ON c.playlistId = p.id
         WHERE p.enabled = 1
-        ORDER BY c.playlistId, c.sortIndex
+        ORDER BY c.name COLLATE NOCASE
         """,
     )
     fun observeEnabledChannels(): Flow<List<ChannelEntity>>
 
+    /**
+     * Categories (groups) in dashboard order: ordered by the first position a channel of
+     * the group appears in the backend catalog (sortIndex), so reordering channels in the
+     * dashboard reorders the categories. Channels themselves are listed alphabetically.
+     */
     @Query(
         """
-        SELECT DISTINCT c.group_title FROM channels c
+        SELECT c.group_title FROM channels c
         INNER JOIN playlist_sources p ON c.playlistId = p.id
         WHERE p.enabled = 1 AND c.group_title IS NOT NULL AND c.group_title != ''
-        ORDER BY c.group_title COLLATE NOCASE
+        GROUP BY c.group_title
+        ORDER BY MIN(c.playlistId), MIN(c.sortIndex)
         """,
     )
     fun observeGroups(): Flow<List<String>>

@@ -113,11 +113,17 @@ fun TvHomeScreen(
                     )
                 else -> {
                     val grouped = state.channels.groupBy { it.group?.takeIf { g -> g.isNotBlank() } ?: "Lainnya" }
+                    // Category order follows the dashboard (state.groups). Leftover buckets not
+                    // in that list (e.g. "Lainnya" for ungrouped channels) are appended at the end.
+                    val orderedKeys = buildList {
+                        state.groups.forEach { if (grouped.containsKey(it)) add(it) }
+                        grouped.keys.forEach { if (it !in this) add(it) }
+                    }
                     val cats = buildList {
                         add(TvCategory("all", "Semua", Icons.Filled.GridView, state.channels))
                         if (state.favorites.isNotEmpty()) add(TvCategory("fav", "Favorit", Icons.Filled.Favorite, state.favorites))
                         if (state.history.isNotEmpty()) add(TvCategory("hist", "Baru ditonton", Icons.Filled.History, state.history))
-                        grouped.keys.sorted().forEach { g -> add(TvCategory("g:$g", g, Icons.Filled.Label, grouped.getValue(g))) }
+                        orderedKeys.forEach { g -> add(TvCategory("g:$g", g, Icons.Filled.Label, grouped.getValue(g))) }
                     }
                     val current = cats.firstOrNull { it.key == selectedKey } ?: cats.first()
                     val searching = state.query.isNotBlank()
