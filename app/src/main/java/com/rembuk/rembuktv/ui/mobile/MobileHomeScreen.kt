@@ -19,6 +19,10 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -29,7 +33,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +48,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +70,7 @@ import com.rembuk.rembuktv.ui.common.MessageState
 import com.rembuk.rembuktv.ui.common.badgeColor
 import com.rembuk.rembuktv.ui.common.label
 import com.rembuk.rembuktv.ui.common.showSubscribeCta
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,12 +81,14 @@ fun MobileHomeScreen(
     viewModel: ChannelsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    // Locked (paid) channels open the paywall; otherwise play within the browsed category.
-    val onChannelClickInGroup: (Channel) -> Unit = {
-        if (it.locked) onSubscribe() else onChannelClick(it, state.selectedGroup)
-    }
     var searchVisible by remember { mutableStateOf(false) }
     val searchFocus = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+
+    // Categories the user can swipe between: "Semua" (null) first, then the backend groups.
+    val tabs = remember(state.groups) { listOf<String?>(null) + state.groups }
+    val pagerState = rememberPagerState(pageCount = { tabs.size })
+    val searching = state.query.isNotBlank()
 
     // Home is the navigation root: require a double back press to exit the app.
     DoubleBackToExit()
@@ -137,29 +144,6 @@ fun MobileHomeScreen(
                 LaunchedEffect(Unit) { searchFocus.requestFocus() }
             }
 
-            if (state.groups.isNotEmpty()) {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    item {
-                        FilterChip(
-                            selected = state.selectedGroup == null,
-                            onClick = { viewModel.setGroup(null) },
-                            label = { Text("Semua") },
-                        )
-                    }
-                    items(state.groups) { group ->
-                        FilterChip(
-                            selected = state.selectedGroup == group,
-                            onClick = { viewModel.setGroup(group) },
-                            label = { Text(group) },
-                            colors = FilterChipDefaults.filterChipColors(),
-                        )
-                    }
-                }
-            }
-
             when {
                 state.loading -> LoadingState()
                 state.channels.isEmpty() && state.favorites.isEmpty() && state.query.isBlank() ->
@@ -169,16 +153,59 @@ fun MobileHomeScreen(
                         actionLabel = "Donasi",
                         onAction = onSubscribe,
                     )
-                else -> PullToRefreshBox(
+                // While searching, show a flat result list across all categories.
+                searching -> PullToRefreshBox(
                     isRefreshing = state.refreshing,
                     onRefresh = viewModel::refresh,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                 ) {
-                    ChannelGrid(
-                        state = state,
-                        onChannelClick = onChannelClickInGroup,
+                    ChannelGridPage(
+                        channels = state.channels,
+                        showSections = false,
+                        favorites = state.favorites,
+                        history = state.history,
+                        favoriteIds = state.favoriteIds,
+                        gridColumns = state.gridColumns,
+                        onChannelClick = { if (it.locked) onSubscribe() else onChannelClick(it, null) },
                         onToggleFavorite = viewModel::toggleFavorite,
                     )
+                }
+                else -> {
+                    if (tabs.size > 1) {
+                        CategoryChips(
+                            tabs = tabs,
+                            selectedIndex = pagerState.currentPage,
+                            onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
+                        )
+                    }
+                    // Swipe left/right to move between categories.
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                    ) { page ->
+                        val group = tabs.getOrNull(page)
+                        val pageChannels = if (group == null) {
+                            state.channels
+                        } else {
+                            state.channels.filter { it.group == group }
+                        }
+                        PullToRefreshBox(
+                            isRefreshing = state.refreshing,
+                            onRefresh = viewModel::refresh,
+                            modifier = Modifier.fillMaxSize(),
+                        ) {
+                            ChannelGridPage(
+                                channels = pageChannels,
+                                showSections = group == null,
+                                favorites = state.favorites,
+                                history = state.history,
+                                favoriteIds = state.favoriteIds,
+                                gridColumns = state.gridColumns,
+                                onChannelClick = { if (it.locked) onSubscribe() else onChannelClick(it, group) },
+                                onToggleFavorite = viewModel::toggleFavorite,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -186,39 +213,69 @@ fun MobileHomeScreen(
 }
 
 @Composable
-private fun ChannelGrid(
-    state: com.rembuk.rembuktv.ui.ChannelsUiState,
+private fun CategoryChips(
+    tabs: List<String?>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    // Keep the active category chip in view as the pager moves.
+    LaunchedEffect(selectedIndex) {
+        if (selectedIndex in tabs.indices) listState.animateScrollToItem(selectedIndex)
+    }
+    LazyRow(
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        itemsIndexed(tabs) { index, group ->
+            FilterChip(
+                selected = index == selectedIndex,
+                onClick = { onSelect(index) },
+                label = { Text(group ?: "Semua") },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChannelGridPage(
+    channels: List<Channel>,
+    showSections: Boolean,
+    favorites: List<Channel>,
+    history: List<Channel>,
+    favoriteIds: Set<String>,
+    gridColumns: Int,
     onChannelClick: (Channel) -> Unit,
     onToggleFavorite: (Channel) -> Unit,
 ) {
-    val showRows = state.query.isBlank() && state.selectedGroup == null
     LazyVerticalGrid(
-        columns = if (state.gridColumns > 0) GridCells.Fixed(state.gridColumns) else GridCells.Adaptive(112.dp),
+        columns = if (gridColumns > 0) GridCells.Fixed(gridColumns) else GridCells.Adaptive(112.dp),
         contentPadding = PaddingValues(12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        if (showRows && state.favorites.isNotEmpty()) {
+        if (showSections && favorites.isNotEmpty()) {
             fullSpan { SectionTitle("Favorit") }
-            fullSpan { HorizontalChannelRow(state.favorites, state.favoriteIds, onChannelClick, onToggleFavorite) }
+            fullSpan { HorizontalChannelRow(favorites, favoriteIds, onChannelClick, onToggleFavorite) }
         }
-        if (showRows && state.history.isNotEmpty()) {
+        if (showSections && history.isNotEmpty()) {
             fullSpan { SectionTitle("Baru ditonton") }
-            fullSpan { HorizontalChannelRow(state.history, state.favoriteIds, onChannelClick, onToggleFavorite) }
+            fullSpan { HorizontalChannelRow(history, favoriteIds, onChannelClick, onToggleFavorite) }
         }
-        if (showRows) {
+        if (showSections) {
             fullSpan { SectionTitle("Semua channel") }
         }
-        items(state.channels, key = { it.id }) { channel ->
+        items(channels, key = { it.id }) { channel ->
             ChannelCard(
                 channel = channel,
-                isFavorite = state.favoriteIds.contains(channel.id),
+                isFavorite = favoriteIds.contains(channel.id),
                 onClick = { onChannelClick(channel) },
                 onToggleFavorite = { onToggleFavorite(channel) },
             )
         }
-        if (state.channels.isEmpty() && !showRows) {
+        if (channels.isEmpty()) {
             fullSpan {
                 Text(
                     "Tidak ada channel cocok.",
