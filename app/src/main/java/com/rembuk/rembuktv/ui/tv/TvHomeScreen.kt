@@ -1,6 +1,11 @@
 package com.rembuk.rembuktv.ui.tv
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +34,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme as M3Theme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text as M3Text
@@ -43,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -63,6 +70,7 @@ import androidx.tv.material3.darkColorScheme
 import com.rembuk.rembuktv.domain.model.Channel
 import com.rembuk.rembuktv.ui.ChannelsViewModel
 import com.rembuk.rembuktv.ui.common.ChannelLogo
+import com.rembuk.rembuktv.ui.common.DoubleBackToExit
 import com.rembuk.rembuktv.ui.common.LoadingState
 import com.rembuk.rembuktv.ui.common.MessageState
 import com.rembuk.rembuktv.ui.common.badgeColor
@@ -88,6 +96,9 @@ fun TvHomeScreen(
     var searchVisible by remember { mutableStateOf(false) }
     val searchFocus = remember { FocusRequester() }
     var selectedKey by remember { mutableStateOf("all") }
+
+    // Home is the navigation root: require a double back press to exit the app.
+    DoubleBackToExit()
 
     MaterialTheme(colorScheme = darkColorScheme()) {
         Surface(modifier = Modifier.fillMaxSize()) {
@@ -157,6 +168,10 @@ fun TvHomeScreen(
                                     Button(onClick = onSubscribe) { Text("Donasi") }
                                     Spacer(Modifier.width(12.dp))
                                 }
+                                Button(onClick = { viewModel.refresh() }, enabled = !state.refreshing) {
+                                    RefreshIcon(refreshing = state.refreshing)
+                                }
+                                Spacer(Modifier.width(12.dp))
                                 Button(onClick = {
                                     searchVisible = !searchVisible
                                     if (!searchVisible) viewModel.setQuery("")
@@ -208,6 +223,31 @@ fun TvHomeScreen(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun RefreshIcon(refreshing: Boolean) {
+    if (refreshing) {
+        val transition = rememberInfiniteTransition(label = "refresh")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
+            label = "angle",
+        )
+        Icon(
+            Icons.Filled.Refresh,
+            contentDescription = "Menyegarkan playlist…",
+            modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = angle },
+        )
+    } else {
+        Icon(
+            Icons.Filled.Refresh,
+            contentDescription = "Segarkan playlist",
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 

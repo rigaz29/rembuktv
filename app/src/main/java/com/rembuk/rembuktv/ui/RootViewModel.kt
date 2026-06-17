@@ -34,12 +34,14 @@ class RootViewModel @Inject constructor(
     val resumeChannelId: StateFlow<String?> = _resumeChannelId.asStateFlow()
 
     init {
-        // Sync with the backend on launch then on an interval to keep entitlement + catalog
-        // fresh. The Room/DataStore cache renders the UI immediately/offline meanwhile.
+        // Periodic re-sync while the app stays open, to keep entitlement + catalog fresh.
+        // The initial/foreground sync is driven by [onEnterApp]; here we only top up on an
+        // interval (delay first to avoid double-syncing right after the launch sync). The
+        // Room/DataStore cache renders the UI immediately/offline meanwhile.
         viewModelScope.launch {
             while (true) {
-                playlistRepository.sync(BuildConfig.VERSION_NAME)
                 delay(Constants.SYNC_INTERVAL_MILLIS)
+                playlistRepository.sync(BuildConfig.VERSION_NAME)
             }
         }
         // Resolve the auto-resume target once at startup.
@@ -50,6 +52,14 @@ class RootViewModel @Inject constructor(
                 _resumeChannelId.value = lastId
             }
         }
+    }
+
+    /**
+     * Refresh the playlist/entitlement whenever the app is (re)entered — on cold start and
+     * every time it returns to the foreground. Triggered from [AppRoot] on ON_START.
+     */
+    fun onEnterApp() {
+        viewModelScope.launch { playlistRepository.sync(BuildConfig.VERSION_NAME) }
     }
 
     fun consumeResume() {

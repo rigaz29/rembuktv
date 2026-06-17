@@ -1,5 +1,7 @@
 package com.rembuk.rembuktv.ui.common
 
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,14 +15,21 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.delay
 
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
@@ -97,4 +106,34 @@ fun ChannelLogo(
 @Composable
 fun LoadingDot(modifier: Modifier = Modifier) {
     CircularProgressIndicator(modifier = modifier.size(18.dp), strokeWidth = 2.dp)
+}
+
+/**
+ * Require two consecutive back presses to leave the app. The first press shows a hint and
+ * "arms" the gate; a second press within [timeoutMillis] falls through to the system's
+ * default back behaviour (finishing the activity), otherwise the gate re-arms.
+ *
+ * Use only on a screen that is the navigation root — elsewhere back should still pop.
+ */
+@Composable
+fun DoubleBackToExit(
+    message: String = "Tekan sekali lagi untuk keluar",
+    timeoutMillis: Long = 2_000L,
+) {
+    val context = LocalContext.current
+    var armed by remember { mutableStateOf(false) }
+
+    // While armed, disable our handler so the next back press is handled by the system
+    // (exits the app), then auto-reset after the timeout.
+    if (armed) {
+        LaunchedEffect(Unit) {
+            delay(timeoutMillis)
+            armed = false
+        }
+    }
+
+    BackHandler(enabled = !armed) {
+        armed = true
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
 }

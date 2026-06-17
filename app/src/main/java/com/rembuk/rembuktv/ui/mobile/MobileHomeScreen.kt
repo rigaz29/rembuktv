@@ -60,6 +60,7 @@ import com.rembuk.rembuktv.domain.model.Channel
 import com.rembuk.rembuktv.domain.model.Entitlement
 import com.rembuk.rembuktv.ui.ChannelsViewModel
 import com.rembuk.rembuktv.ui.common.ChannelLogo
+import com.rembuk.rembuktv.ui.common.DoubleBackToExit
 import com.rembuk.rembuktv.ui.common.LoadingState
 import com.rembuk.rembuktv.ui.common.MessageState
 import com.rembuk.rembuktv.ui.common.badgeColor
@@ -81,6 +82,9 @@ fun MobileHomeScreen(
     }
     var searchVisible by remember { mutableStateOf(false) }
     val searchFocus = remember { FocusRequester() }
+
+    // Home is the navigation root: require a double back press to exit the app.
+    DoubleBackToExit()
 
     Scaffold(
         topBar = {
